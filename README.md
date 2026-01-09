@@ -106,14 +106,21 @@ A aplicação estará disponível em `http://localhost:3000`
 
 ## 🔄 Cron Jobs
 
-O projeto inclui vários cron jobs configurados no `vercel.json`:
+O projeto utiliza **2 cron jobs orquestradores** (otimizado para plano Hobby da Vercel com limite de 2 cron jobs):
 
-- **Queue-Times Live**: A cada 5 minutos - Atualiza dados de fila em tempo real
-- **Aggregate Hourly**: A cada hora - Calcula estatísticas por hora (p50/p80/p95)
-- **Queue-Times Calendar**: A cada 6 horas - Atualiza crowd calendar
-- **Queue-Times Stats**: 1x por dia (3h) - Atualiza estatísticas históricas
-- **ThemeParks Schedule**: 1x por dia (4h) - Atualiza horários de funcionamento
-- **Aggregate Daily**: 1x por dia (5h) - Calcula park_day_scores
+### 1. Frequent Cron (`/api/cron/frequent`)
+Roda **a cada 5 minutos** e executa:
+- **Queue-Times Live**: Sempre - Atualiza dados de fila em tempo real
+- **Aggregate Hourly**: Na hora cheia (minuto 0) - Calcula estatísticas por hora (p50/p80/p95)
+- **Queue-Times Calendar**: A cada 6 horas (0h, 6h, 12h, 18h) - Atualiza crowd calendar
+
+### 2. Daily Cron (`/api/cron/daily`)
+Roda **1x por dia às 3h** e executa todas as tarefas diárias em sequência:
+- **Queue-Times Stats**: Atualiza estatísticas históricas
+- **ThemeParks Schedule**: Atualiza horários de funcionamento
+- **Aggregate Daily**: Calcula park_day_scores
+
+**Nota**: Cada tarefa dentro dos orquestradores usa locks individuais para evitar execuções concorrentes.
 
 ## 📊 APIs
 
