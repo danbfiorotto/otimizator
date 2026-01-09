@@ -1,0 +1,28 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/queuetimes_live",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/aggregate_hourly",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/queuetimes_calendar",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/queuetimes_stats",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/themeparks_schedule",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/aggregate_daily",
+      "schedule": "0 5 * * *"
+    }
+  ]
+}
