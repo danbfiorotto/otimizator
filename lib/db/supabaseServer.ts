@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import { createServerClient as createSSRClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -23,7 +24,7 @@ export function createServerClient(useServiceRole: boolean = false) {
   }
 
   const cookieStore = cookies()
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  return createSSRClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value
@@ -60,3 +61,6 @@ export function createServiceClient() {
     },
   })
 }
+
+// createBrowserClient foi movido para lib/db/supabaseClient.ts
+// para evitar importar next/headers em Client Components

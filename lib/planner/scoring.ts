@@ -22,7 +22,7 @@ export interface ScoringWeights {
   heavyStreakPenalty: number
 }
 
-const DEFAULT_WEIGHTS: ScoringWeights = {
+export const DEFAULT_WEIGHTS: ScoringWeights = {
   crowd: 1.0,
   hours: 0.5,
   weekendPenalty: 0.3,

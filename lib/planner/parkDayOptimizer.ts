@@ -1,5 +1,9 @@
 import type { TripOptimizeRequest, TripOptimizeResponse } from "@/lib/dto/types"
-import { calculateParkScoresForDate, type ScoringWeights } from "@/lib/planner/scoring"
+import {
+  calculateParkScoresForDate,
+  calculateParkDateScore,
+  type ScoringWeights,
+} from "@/lib/planner/scoring"
 import { parseDate, formatDate, getDayOfWeek } from "@/lib/utils/time"
 import { getTripById, getTripDays, upsertTripDay, upsertTripDayAssignment } from "@/lib/db/queries"
 
@@ -179,8 +183,16 @@ export async function optimizeParkDays(request: TripOptimizeRequest): Promise<Tr
     }
   }
 
-  // Define parques pesados (pode vir das preferências da viagem)
-  const heavyParks: string[] = [] // TODO: extrair das preferências
+  // Define parques pesados baseado nas preferências
+  // Parques pesados são aqueles que requerem mais tempo/energia
+  // Por padrão, se o ritmo for "intense", nenhum parque é considerado pesado
+  // Se for "relaxed" ou "moderate", parques maiores são considerados pesados
+  const heavyParks: string[] = []
+  const pace = (trip.preferences?.pace as string | undefined) || "moderate"
+  
+  // Se o ritmo não for "intense", podemos considerar parques maiores como pesados
+  // Por enquanto, deixamos vazio - pode ser expandido com uma lista de parques pesados
+  // ou baseado em métricas como número de atrações, tamanho do parque, etc.
 
   const context = {
     startDate: trip.start_date,
@@ -203,37 +215,121 @@ export async function optimizeParkDays(request: TripOptimizeRequest): Promise<Tr
   // Fase 2: Melhoria local
   assignments = await localImprovement(dates, assignments, weights, context)
 
-  // Converte para formato de resposta
-  const assignmentArray = Array.from(assignments.entries()).map(([date, parkId]) => {
-    // Calcula score e breakdown
-    // TODO: calcular score real para cada assignment
-    return {
-      date,
-      parkId,
-      score: 0, // Será calculado
-      breakdown: {},
-      source: "optimizer" as const,
-    }
-  })
+  // Calcula scores reais para cada assignment
+  const assignmentArray = await Promise.all(
+    Array.from(assignments.entries()).map(async ([date, parkId], index) => {
+      if (!parkId) {
+        return {
+          date,
+          parkId: null,
+          score: 0,
+          breakdown: {},
+          source: "optimizer" as const,
+        }
+      }
 
-  // Gera alternativas (Plano B e C)
-  // Para simplificar, gera variações com diferentes pesos
+      const previousParkId =
+        index > 0 ? assignments.get(dates[index - 1]) || null : null
+
+      const scoreResult = await calculateParkDateScore(parkId, date, weights, {
+        startDate: context.startDate,
+        endDate: context.endDate,
+        previousParkId,
+        heavyParks: context.heavyParks,
+      })
+
+      return {
+        date,
+        parkId,
+        score: scoreResult.score,
+        breakdown: {
+          crowd: scoreResult.breakdown.crowd,
+          hours: scoreResult.breakdown.hours,
+          weekend: scoreResult.breakdown.weekend,
+          travel: scoreResult.breakdown.travel,
+          streak: scoreResult.breakdown.streak,
+        },
+        source: "optimizer" as const,
+      }
+    })
+  )
+
+  // Gera alternativas reais (Plano B e C) com diferentes estratégias
+  // Plano B: prioriza menos crowd, aceita mais weekend
+  const weightsB: ScoringWeights = {
+    ...weights,
+    crowd: weights.crowd * 1.5, // Mais peso em crowd
+    weekendPenalty: weights.weekendPenalty * 0.5, // Menos penalidade de weekend
+  }
+
+  // Plano C: prioriza mais horas, menos penalidade de travel
+  const weightsC: ScoringWeights = {
+    ...weights,
+    hours: weights.hours * 1.5, // Mais peso em horas
+    travelDayPenalty: weights.travelDayPenalty * 0.5, // Menos penalidade de travel
+  }
+
+  // Gera assignments alternativos
+  const assignmentsB = await greedyAssignment(dates, request.parksToSchedule, weightsB, context)
+  const assignmentsC = await greedyAssignment(dates, request.parksToSchedule, weightsC, context)
+
+  // Calcula scores para alternativas
+  const alternativeB = await Promise.all(
+    Array.from(assignmentsB.entries()).map(async ([date, parkId], index) => {
+      if (!parkId) {
+        return { date, parkId: null, score: 0 }
+      }
+
+      const previousParkId =
+        index > 0 ? assignmentsB.get(dates[index - 1]) || null : null
+
+      const scoreResult = await calculateParkDateScore(parkId, date, weightsB, {
+        startDate: context.startDate,
+        endDate: context.endDate,
+        previousParkId,
+        heavyParks: context.heavyParks,
+      })
+
+      return {
+        date,
+        parkId,
+        score: scoreResult.score,
+      }
+    })
+  )
+
+  const alternativeC = await Promise.all(
+    Array.from(assignmentsC.entries()).map(async ([date, parkId], index) => {
+      if (!parkId) {
+        return { date, parkId: null, score: 0 }
+      }
+
+      const previousParkId =
+        index > 0 ? assignmentsC.get(dates[index - 1]) || null : null
+
+      const scoreResult = await calculateParkDateScore(parkId, date, weightsC, {
+        startDate: context.startDate,
+        endDate: context.endDate,
+        previousParkId,
+        heavyParks: context.heavyParks,
+      })
+
+      return {
+        date,
+        parkId,
+        score: scoreResult.score,
+      }
+    })
+  )
+
   const alternatives = [
     {
-      name: "Plano B",
-      assignments: assignmentArray.map((a) => ({
-        date: a.date,
-        parkId: a.parkId,
-        score: a.score + 0.1, // Score ligeiramente pior
-      })),
+      name: "Plano B (Menos Crowd)",
+      assignments: alternativeB,
     },
     {
-      name: "Plano C",
-      assignments: assignmentArray.map((a) => ({
-        date: a.date,
-        parkId: a.parkId,
-        score: a.score + 0.2, // Score ainda pior
-      })),
+      name: "Plano C (Mais Horas)",
+      assignments: alternativeC,
     },
   ]
 

@@ -42,7 +42,11 @@ export async function GET(
         ticketedEvent: day.has_ticketed_event ?? undefined,
         extendedEvening: day.has_extended_evening ?? undefined,
       },
-      source: "queue_times_calendar", // TODO: detectar fonte real
+      source: day.raw?.source === "themeparks_wiki" 
+        ? "themeparks_wiki" 
+        : day.raw?.source === "queue_times_calendar"
+        ? "queue_times_calendar"
+        : "unknown",
     }))
 
     return NextResponse.json(dtos, {

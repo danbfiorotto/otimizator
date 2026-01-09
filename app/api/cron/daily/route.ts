@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { withLock } from "@/lib/utils/cronLock"
 import { processQueueTimesStats } from "@/lib/connectors/queueTimesStatsScraper"
 import { processParkDayScoresForUpcoming } from "@/lib/aggregations/daily"
+import { processThemeParksScheduleForAllParks } from "@/lib/connectors/themeParksScheduleProcessor"
 import { getSourceMapping } from "@/lib/db/queries"
 import { getParks } from "@/lib/db/queries"
 
@@ -61,9 +62,8 @@ export async function GET(request: NextRequest) {
 
   // 2. ThemeParks Schedule
   const scheduleResult = await withLock("themeparks_schedule", async () => {
-    // TODO: Implementar fetch e processamento de schedule do ThemeParks.wiki
-    // Por enquanto, apenas retorna sucesso
-    return { processed: 0, errors: 0 }
+    const parks = await getParks()
+    return await processThemeParksScheduleForAllParks(parks, 60)
   })
 
   if (scheduleResult !== null) {

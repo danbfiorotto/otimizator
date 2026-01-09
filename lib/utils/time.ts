@@ -1,8 +1,9 @@
 import { format, parse, addMinutes, differenceInMinutes, isBefore, isAfter } from "date-fns"
-import { formatInTimeZone, toZonedTime, fromZonedTime } from "date-fns-tz"
+import { formatInTimeZone } from "date-fns-tz"
 
 /**
  * Converte um time string (HH:mm) para Date no timezone especificado
+ * Implementação simplificada usando apenas formatInTimeZone
  */
 export function timeStringToDate(
   timeString: string,
@@ -10,9 +11,22 @@ export function timeStringToDate(
   timezone: string
 ): Date {
   const [hours, minutes] = timeString.split(":").map(Number)
-  const zonedDate = toZonedTime(date, timezone)
-  zonedDate.setHours(hours, minutes, 0, 0)
-  return fromZonedTime(zonedDate, timezone)
+  const dateStr = format(date, "yyyy-MM-dd")
+  
+  // Cria uma data local assumindo o horário fornecido
+  const localDate = new Date(`${dateStr}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`)
+  
+  // Obtém o que essa data seria no timezone alvo
+  const targetTimeStr = formatInTimeZone(localDate, timezone, "HH:mm")
+  const [targetHours, targetMinutes] = targetTimeStr.split(":").map(Number)
+  
+  // Calcula a diferença de offset
+  const hourDiff = hours - targetHours
+  const minuteDiff = minutes - targetMinutes
+  const offsetMs = (hourDiff * 60 + minuteDiff) * 60000
+  
+  // Retorna a data ajustada pelo offset
+  return new Date(localDate.getTime() - offsetMs)
 }
 
 /**

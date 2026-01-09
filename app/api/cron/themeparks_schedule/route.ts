@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { withLock } from "@/lib/utils/cronLock"
+import { getParks } from "@/lib/db/queries"
+import { processThemeParksScheduleForAllParks } from "@/lib/connectors/themeParksScheduleProcessor"
 
 const LOCK_KEY = "themeparks_schedule"
 const CRON_SECRET = process.env.CRON_SECRET
@@ -15,9 +17,8 @@ export async function GET(request: NextRequest) {
   }
 
   const result = await withLock(LOCK_KEY, async () => {
-    // TODO: Implementar fetch e processamento de schedule do ThemeParks.wiki
-    // Por enquanto, apenas retorna sucesso
-    return { processed: 0, errors: 0 }
+    const parks = await getParks()
+    return await processThemeParksScheduleForAllParks(parks, 60)
   })
 
   if (result === null) {

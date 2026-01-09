@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/db/supabaseServer"
 import { getTripsByGroup, createTrip } from "@/lib/db/queries"
+import { getGroupSession } from "@/lib/utils/session"
 import { z } from "zod"
 
 const createTripSchema = z.object({
-  groupId: z.string().uuid(),
   name: z.string().min(1),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -13,38 +12,18 @@ const createTripSchema = z.object({
 })
 
 /**
- * GET /api/trips - Lista viagens do grupo do usuário
+ * GET /api/trips - Lista viagens do grupo atual
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const groupId = await getGroupSession()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!groupId) {
+      return NextResponse.json({ error: "No active group session" }, { status: 401 })
     }
 
-    // Busca grupos do usuário
-    const { data: groupMembers } = await supabase
-      .from("group_members")
-      .select("group_id")
-      .eq("user_id", user.id)
-
-    if (!groupMembers || groupMembers.length === 0) {
-      return NextResponse.json([])
-    }
-
-    const groupIds = groupMembers.map((gm) => gm.group_id)
-    const allTrips = []
-
-    for (const groupId of groupIds) {
-      const trips = await getTripsByGroup(groupId)
-      allTrips.push(...trips)
-    }
-
-    return NextResponse.json(allTrips)
+    const trips = await getTripsByGroup(groupId)
+    return NextResponse.json(trips)
   } catch (error) {
     console.error("Error fetching trips:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -52,36 +31,21 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/trips - Cria nova viagem
+ * POST /api/trips - Cria nova viagem no grupo atual
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const groupId = await getGroupSession()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!groupId) {
+      return NextResponse.json({ error: "No active group session" }, { status: 401 })
     }
 
     const body = await request.json()
     const validated = createTripSchema.parse(body)
 
-    // Verifica se usuário é membro do grupo
-    const { data: member } = await supabase
-      .from("group_members")
-      .select("*")
-      .eq("group_id", validated.groupId)
-      .eq("user_id", user.id)
-      .single()
-
-    if (!member) {
-      return NextResponse.json({ error: "Not a member of this group" }, { status: 403 })
-    }
-
     const trip = await createTrip({
-      group_id: validated.groupId,
+      group_id: groupId,
       name: validated.name,
       start_date: validated.startDate,
       end_date: validated.endDate,

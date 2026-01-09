@@ -78,16 +78,92 @@ async function swapItem(
   planItems: DayPlanResponse["items"],
   itemIndex: number,
   reason: "closed" | "high_wait",
-  availableAttractions: string[]
+  availableAttractions: string[],
+  liveData: Map<string, LiveAttractionData>,
+  currentTime: string,
+  parkId: string
 ): Promise<DayPlanResponse["items"]> {
   // Remove item problemático
   const newItems = [...planItems]
+  const removedItem = newItems[itemIndex]
   newItems.splice(itemIndex, 1)
 
-  // TODO: Implementar lógica de substituição inteligente
-  // Por enquanto, apenas remove o item
+  // Se não há atrações disponíveis, apenas remove
+  if (availableAttractions.length === 0) {
+    return newItems
+  }
 
-  return newItems
+  // Busca atrações que ainda não estão no plano
+  const plannedAttractionIds = new Set(
+    newItems.filter((i) => i.attractionId).map((i) => i.attractionId!)
+  )
+  const unplannedAttractions = availableAttractions.filter(
+    (id) => !plannedAttractionIds.has(id)
+  )
+
+  if (unplannedAttractions.length === 0) {
+    return newItems
+  }
+
+  // Escolhe a melhor alternativa baseado em:
+  // 1. Está aberta
+  // 2. Tem menor fila
+  // 3. Está próxima no tempo (pode ser inserida no slot)
+  const candidates = unplannedAttractions
+    .map((attractionId) => {
+      const live = liveData.get(attractionId)
+      if (!live || !live.isOpen) return null
+
+      return {
+        attractionId,
+        waitMinutes: live.waitMinutes,
+        score: live.waitMinutes, // Menor = melhor
+      }
+    })
+    .filter((c): c is { attractionId: string; waitMinutes: number; score: number } => c !== null)
+    .sort((a, b) => a.score - b.score)
+
+  if (candidates.length === 0) {
+    return newItems
+  }
+
+  // Insere a melhor alternativa no mesmo slot
+  const bestCandidate = candidates[0]
+  const startTime = removedItem.startTimeLocal
+  const endTime = removedItem.endTimeLocal
+
+  // Calcula novo end time baseado no wait time
+  const [startHour, startMin] = startTime.split(":").map(Number)
+  const totalMinutes = startHour * 60 + startMin + bestCandidate.waitMinutes + (removedItem.expectedWalk || 10)
+  const newEndHour = Math.floor(totalMinutes / 60)
+  const newEndMin = totalMinutes % 60
+  const newEndTime = `${String(newEndHour).padStart(2, "0")}:${String(newEndMin).padStart(2, "0")}`
+
+  // Busca nome da atração
+  const { getAttractionsByPark } = await import("@/lib/db/queries")
+  const attractions = await getAttractionsByPark(parkId)
+  const attraction = attractions.find((a) => a.id === bestCandidate.attractionId)
+
+  newItems.splice(itemIndex, 0, {
+    orderIndex: itemIndex,
+    type: "ride",
+    title: attraction?.name || "Nova Atração",
+    attractionId: bestCandidate.attractionId,
+    startTimeLocal: startTime,
+    endTimeLocal: newEndTime,
+    expectedWait: bestCandidate.waitMinutes,
+    expectedWalk: removedItem.expectedWalk || 10,
+    riskScore: 0.1, // Baixo risco se está aberta
+    explanation: [
+      `Substituído por ${attraction?.name || "nova atração"} (fila: ${bestCandidate.waitMinutes} min)`,
+    ],
+  })
+
+  // Reordena orderIndex
+  return newItems.map((item, idx) => ({
+    ...item,
+    orderIndex: idx,
+  }))
 }
 
 /**
@@ -153,9 +229,29 @@ export async function replanWithLiveData(
     ...(request.wantAttractionIds || []),
   ]
 
-  for (const divergence of divergences) {
+  // Ordena divergências por índice (do maior para o menor) para evitar problemas de índice ao remover
+  const sortedDivergences = [...divergences].sort((a, b) => b.itemIndex - a.itemIndex)
+
+  // Calcula tempo atual (pode ser melhorado para usar hora real)
+  const currentTime = new Date().toISOString().substring(11, 16) // HH:mm
+
+  for (const divergence of sortedDivergences) {
     if (divergence.reason === "closed" || divergence.reason === "high_wait") {
-      newItems = await swapItem(newItems, divergence.itemIndex, divergence.reason, availableAttractions)
+      // Ajusta índice se já houve remoções anteriores
+      const adjustedIndex = newItems.findIndex(
+        (item) => item.orderIndex === divergence.item.orderIndex
+      )
+      if (adjustedIndex >= 0) {
+        newItems = await swapItem(
+          newItems,
+          adjustedIndex,
+          divergence.reason,
+          availableAttractions,
+          liveData,
+          currentTime,
+          request.parkId
+        )
+      }
     }
   }
 
