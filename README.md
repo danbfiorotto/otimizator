@@ -169,6 +169,8 @@ npm run test:e2e
 2. Configure as variáveis de ambiente no painel da Vercel
 3. O deploy será automático a cada push
 
+**📖 Para instruções detalhadas, consulte [VERCEL_DEPLOY.md](./VERCEL_DEPLOY.md)**
+
 ### Migrations
 
 Execute as migrations no Supabase antes do primeiro deploy:
