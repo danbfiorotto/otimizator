@@ -106,19 +106,29 @@ A aplicação estará disponível em `http://localhost:3000`
 
 ## 🔄 Cron Jobs
 
-O projeto utiliza **2 cron jobs orquestradores** (otimizado para plano Hobby da Vercel com limite de 2 cron jobs):
+O projeto utiliza **2 cron jobs orquestradores** (otimizado para plano Hobby da Vercel - limite de 2 cron jobs diários):
 
-### 1. Frequent Cron (`/api/cron/frequent`)
-Roda **a cada 5 minutos** e executa:
-- **Queue-Times Live**: Sempre - Atualiza dados de fila em tempo real
-- **Aggregate Hourly**: Na hora cheia (minuto 0) - Calcula estatísticas por hora (p50/p80/p95)
-- **Queue-Times Calendar**: A cada 6 horas (0h, 6h, 12h, 18h) - Atualiza crowd calendar
+### 1. Periodic Cron (`/api/cron/frequent`)
+Roda **1x por dia às 2h** e executa:
+- **Aggregate Hourly**: Calcula estatísticas por hora (p50/p80/p95)
+- **Queue-Times Calendar**: Atualiza crowd calendar (próximos 6 meses)
 
 ### 2. Daily Cron (`/api/cron/daily`)
 Roda **1x por dia às 3h** e executa todas as tarefas diárias em sequência:
 - **Queue-Times Stats**: Atualiza estatísticas históricas
 - **ThemeParks Schedule**: Atualiza horários de funcionamento
 - **Aggregate Daily**: Calcula park_day_scores
+
+### Queue-Times Live (Update On-Demand)
+
+Devido à limitação do plano Hobby (apenas cron jobs diários permitidos), os **dados ao vivo são atualizados on-demand** quando o endpoint `/api/parks/[parkId]/live` é chamado:
+
+- **Cache**: Dados são cacheados por 120 segundos
+- **Auto-Update**: Se os dados estão desatualizados (>5min), atualiza automaticamente em background
+- **Rate Limiting**: Máximo 1 update por parque a cada 5 minutos para evitar sobrecarga
+- **Não-bloqueante**: A resposta retorna imediatamente com dados do cache, atualização ocorre em background
+
+**Alternativa**: Para atualização automática a cada 5 minutos, você pode usar um serviço externo gratuito (ex: cron-job.org, EasyCron) para chamar `/api/cron/queuetimes_live` com o header `Authorization: Bearer ${CRON_SECRET}`.
 
 **Nota**: Cada tarefa dentro dos orquestradores usa locks individuais para evitar execuções concorrentes.
 
