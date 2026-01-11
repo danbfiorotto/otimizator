@@ -2,13 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { DndContext, DragEndEvent, closestCenter } from "@dnd-kit/core"
-import { SortableContext, horizontalListSortingStrategy, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { DayColumn } from "./DayColumn"
 import { SuggestionsSidebar } from "./SuggestionsSidebar"
 import { OptimizeButton } from "./OptimizeButton"
-import { ParkCard } from "./ParkCard"
+import { UnassignedParksColumn } from "./UnassignedParksColumn"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useTrip } from "@/lib/hooks/useTrips"
 import { useParks } from "@/lib/hooks/useParks"
 import { format, eachDayOfInterval, parseISO } from "date-fns"
@@ -188,7 +186,31 @@ export function CalendarBoard({ tripId, trip }: Props) {
     if (!over) return
 
     const parkId = active.id as string
-    const targetDate = over.id as string
+    const targetId = over.id as string
+
+    // Special ID for unassigned parks column
+    const UNASSIGNED_COLUMN_ID = "unassigned-parks"
+
+    // If dropping in unassigned column, remove from all days
+    if (targetId === UNASSIGNED_COLUMN_ID) {
+      setAssignments((prev) => {
+        const newAssignments = { ...prev }
+        // Find and remove park from all days
+        Object.keys(newAssignments).forEach((date) => {
+          if (newAssignments[date].parkId === parkId) {
+            newAssignments[date] = {
+              parkId: null,
+              isLocked: newAssignments[date].isLocked,
+            }
+          }
+        })
+        return newAssignments
+      })
+      return
+    }
+
+    // Target is a date
+    const targetDate = targetId
 
     // Don't allow dragging to locked days
     if (assignments[targetDate]?.isLocked) {
@@ -200,13 +222,27 @@ export function CalendarBoard({ tripId, trip }: Props) {
       return
     }
 
-    setAssignments((prev) => ({
-      ...prev,
-      [targetDate]: {
+    setAssignments((prev) => {
+      const newAssignments = { ...prev }
+      
+      // Remove park from previous day (if any)
+      Object.keys(newAssignments).forEach((date) => {
+        if (newAssignments[date].parkId === parkId && date !== targetDate) {
+          newAssignments[date] = {
+            parkId: null,
+            isLocked: newAssignments[date].isLocked,
+          }
+        }
+      })
+
+      // Assign park to target date
+      newAssignments[targetDate] = {
         parkId,
         isLocked: prev[targetDate]?.isLocked || false,
-      },
-    }))
+      }
+
+      return newAssignments
+    })
 
     // Calculate score in real-time
     calculateScore(parkId, targetDate)
@@ -270,53 +306,32 @@ export function CalendarBoard({ tripId, trip }: Props) {
   }
 
   return (
-    <div className="flex gap-6">
-      {/* Parks Sidebar */}
-      {unassignedParks.length > 0 && (
-        <div className="w-64">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Parques Disponíveis</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext
-                  items={unassignedParks.map((p) => p.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-2">
-                    {unassignedParks.map((park) => (
-                      <ParkCard key={park.id} parkId={park.id} />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <div className="flex gap-6">
+        {/* Coluna de Parques Não Alocados - Sempre visível */}
+        <UnassignedParksColumn parks={unassignedParks} />
 
-      <div className="flex-1">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Calendário da Viagem</h2>
-          <div className="flex gap-2">
-            <OptimizeButton
-              tripId={tripId}
-              onOptimizationComplete={(newAssignments) => {
-                setAssignments(newAssignments)
-              }}
-            />
-            <Button 
-              onClick={handleConfirmCalendar} 
-              disabled={isSaving}
-              className="gap-2"
-            >
-              <Check className="h-4 w-4" />
-              {isSaving ? "Salvando..." : "Confirmar Calendário"}
-            </Button>
+        {/* Calendário Principal */}
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">Calendário da Viagem</h2>
+            <div className="flex gap-2">
+              <OptimizeButton
+                tripId={tripId}
+                onOptimizationComplete={(newAssignments) => {
+                  setAssignments(newAssignments)
+                }}
+              />
+              <Button 
+                onClick={handleConfirmCalendar} 
+                disabled={isSaving}
+                className="gap-2"
+              >
+                <Check className="h-4 w-4" />
+                {isSaving ? "Salvando..." : "Confirmar Calendário"}
+              </Button>
+            </div>
           </div>
-        </div>
-        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {days.map((day) => {
               const dateStr = format(day, "yyyy-MM-dd")
@@ -330,9 +345,11 @@ export function CalendarBoard({ tripId, trip }: Props) {
               )
             })}
           </div>
-        </DndContext>
+        </div>
+
+        {/* Sidebar de Sugestões */}
+        <SuggestionsSidebar tripId={tripId} assignments={assignments} />
       </div>
-      <SuggestionsSidebar tripId={tripId} assignments={assignments} />
-    </div>
+    </DndContext>
   )
 }
