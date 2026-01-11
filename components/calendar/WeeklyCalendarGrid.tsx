@@ -71,34 +71,36 @@ export function WeeklyCalendarGrid({ days, assignments, onLockToggle }: Props) {
   }
 
   return (
-    <div className="space-y-2">
-      {/* Header with week days */}
-      <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 sm:mb-4 overflow-x-auto">
-        {WEEK_DAYS.map((dayName, index) => (
-          <div
-            key={dayName}
-            className={`
-              text-center text-xs sm:text-sm font-bold py-2 sm:py-3 px-1 sm:px-2 rounded-lg
-              ${index >= 5 ? "bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 text-purple-700 dark:text-purple-300" : "bg-gradient-to-br from-primary/10 to-secondary/10 text-primary dark:text-primary-foreground"}
-              border-2 border-transparent min-w-[60px] sm:min-w-0
-            `}
-          >
-            {dayName}
-          </div>
-        ))}
+    <div className="space-y-2 sm:space-y-3">
+      {/* Header with week days - sticky on scroll */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm pb-2 sm:pb-3">
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+          {WEEK_DAYS.map((dayName, index) => (
+            <div
+              key={dayName}
+              className={`
+                text-center text-xs sm:text-sm font-bold py-2 sm:py-3 px-1 sm:px-2 rounded-lg
+                ${index >= 5 ? "bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 text-purple-700 dark:text-purple-300" : "bg-gradient-to-br from-primary/10 to-secondary/10 text-primary dark:text-primary-foreground"}
+                border-2 border-transparent
+              `}
+            >
+              {dayName}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Calendar weeks - scrollable on mobile */}
-      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+      {/* Calendar weeks - scrollable on mobile with better UX */}
+      <div className="overflow-x-auto -mx-4 sm:-mx-6 lg:mx-0 px-4 sm:px-6 lg:px-0 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
         <div className="inline-block min-w-full sm:block">
           {weeks.map((week, weekIndex) => (
-            <div key={weekIndex} className="grid grid-cols-7 gap-1 sm:gap-2 min-w-[560px] sm:min-w-0">
+            <div key={weekIndex} className="grid grid-cols-7 gap-1.5 sm:gap-2 min-w-[700px] sm:min-w-0">
           {week.map((day, dayIndex) => {
             if (!day) {
               return (
                 <div
                   key={`empty-${dayIndex}`}
-                  className="min-h-[120px] sm:min-h-[150px] lg:min-h-[180px] border-2 border-dashed border-muted rounded-lg bg-muted/20"
+                  className="min-h-[140px] sm:min-h-[160px] lg:min-h-[200px] border-2 border-dashed border-muted rounded-lg bg-muted/20"
                 />
               )
             }

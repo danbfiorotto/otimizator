@@ -334,13 +334,13 @@ export function CalendarBoard({ tripId, trip }: Props) {
         </div>
 
         {/* Calendário Principal */}
-        <div className="flex-1 min-w-0 order-1 lg:order-2">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 lg:mb-6">
-            <div>
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+        <div className="flex-1 min-w-0 order-1 lg:order-2 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-6">
+            <div className="flex-shrink-0">
+              <h2 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
                 🎢 Calendário da Viagem
               </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 hidden sm:block">
                 Arraste e solte parques nos dias da semana
               </p>
             </div>

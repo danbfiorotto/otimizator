@@ -43,21 +43,21 @@ export function ParkCard({ parkId }: Props) {
         hover:from-primary/20 hover:via-secondary/20 hover:to-accent/20
       `}
     >
-      <CardContent className="p-2 sm:p-3 flex items-center gap-1 sm:gap-2">
+      <CardContent className="p-2 sm:p-2.5 lg:p-3 flex items-center gap-1.5 sm:gap-2">
         <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing flex-shrink-0">
           <div className="p-0.5 sm:p-1 rounded hover:bg-primary/20 transition-colors">
-            <GripVertical className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+            <GripVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-xs sm:text-sm text-foreground truncate">{park.name}</div>
+          <div className="font-bold text-xs sm:text-sm lg:text-base text-foreground truncate leading-tight">{park.name}</div>
+          <Badge 
+            variant="outline" 
+            className="text-[9px] sm:text-[10px] font-semibold border-primary/30 bg-primary/10 text-primary mt-0.5 sm:mt-1"
+          >
+            {park.slug}
+          </Badge>
         </div>
-        <Badge 
-          variant="outline" 
-          className="text-[10px] sm:text-xs font-semibold border-primary/30 bg-primary/10 text-primary hidden sm:inline-flex"
-        >
-          {park.slug}
-        </Badge>
       </CardContent>
     </Card>
   )
