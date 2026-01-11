@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { DndContext, DragEndEvent, closestCenter } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useDayPlan } from "@/lib/hooks/useDayPlan"
+import type { DayPlanResponse } from "@/lib/dto/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TimelineItem } from "./TimelineItem"
 import { MetricsCard } from "./MetricsCard"
@@ -19,7 +20,6 @@ import { RefreshCw, Download, RadioIcon, FileText, Image, FileDown, AlertCircle,
 import { useReplan } from "@/lib/hooks/useReplan"
 import { useParkLive } from "@/lib/hooks/useParkLive"
 import { useToast } from "@/components/ui/use-toast"
-import { useState, useEffect } from "react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { exportAsImage, exportAsPDF, exportAsText } from "@/lib/utils/export"
@@ -40,7 +40,7 @@ export function TimelineView({ tripId, date }: Props) {
   const [liveMode, setLiveMode] = useState(false)
   const [isSavingFinal, setIsSavingFinal] = useState(false)
   const [fixedItemIds, setFixedItemIds] = useState<Set<number>>(new Set())
-  const [reorderedItems, setReorderedItems] = useState<typeof plan.items | null>(null)
+  const [reorderedItems, setReorderedItems] = useState<DayPlanResponse["items"] | null>(null)
   const parkId = plan?.parkId || ""
   
   // Use reordered items if available, otherwise use plan items
@@ -190,14 +190,14 @@ export function TimelineView({ tripId, date }: Props) {
     }
   }
 
-  const handleExport = async (format: "image" | "pdf" | "text") => {
+  const handleExport = async (exportFormat: "image" | "pdf" | "text") => {
     if (!plan) return
 
     try {
       const dateFormatted = format(parseISO(date), "dd-MM-yyyy", { locale: ptBR })
       const filenameBase = `plano-${dateFormatted}`
 
-      if (format === "text") {
+      if (exportFormat === "text") {
         exportAsText(plan, `${filenameBase}.txt`)
         toast({
           title: "Exportado",
@@ -211,13 +211,13 @@ export function TimelineView({ tripId, date }: Props) {
         try {
           const timelineId = `timeline-${tripId}-${date}`
           
-          if (format === "image") {
+          if (exportFormat === "image") {
             await exportAsImage(timelineId, `${filenameBase}.png`)
             toast({
               title: "Exportado",
               description: "Plano exportado como imagem",
             })
-          } else if (format === "pdf") {
+          } else if (exportFormat === "pdf") {
             await exportAsPDF(
               timelineId,
               `${filenameBase}.pdf`,
@@ -397,7 +397,7 @@ export function TimelineView({ tripId, date }: Props) {
                 >
                   <div className="space-y-4">
                     {displayItems.map((item) => {
-                      const live = item.attractionId ? liveDataMap.get(item.attractionId) : null
+                      const live = item.attractionId ? liveDataMap.get(item.attractionId) : undefined
                       const suggestion = suggestions.find((s) => s.item.attractionId === item.attractionId)
                       const isFixed = fixedItemIds.has(item.orderIndex)
                       
@@ -405,7 +405,7 @@ export function TimelineView({ tripId, date }: Props) {
                         <TimelineItem 
                           key={item.orderIndex} 
                           item={item}
-                          liveData={live}
+                          liveData={live ?? undefined}
                           hasSuggestion={!!suggestion}
                           isFixed={isFixed}
                           onToggleFixed={() => handleToggleFixed(item.orderIndex)}

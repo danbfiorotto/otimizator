@@ -28,9 +28,17 @@ export function AlternativesModal({ alternatives, onClose, onApply }: Props) {
     return parks?.find((p) => p.id === parkId)?.name || parkId
   }
 
-  const handleApply = (assignments: TripOptimizeResponse["assignments"]) => {
+  const handleApply = (
+    assignments: TripOptimizeResponse["assignments"] | TripOptimizeResponse["alternatives"][number]["assignments"]
+  ) => {
     if (onApply) {
-      onApply(assignments)
+      // Transform alternative assignments to match main assignments format
+      const formattedAssignments = assignments.map((a) => ({
+        ...a,
+        breakdown: "breakdown" in a ? a.breakdown : {},
+        source: ("source" in a ? a.source : "optimizer") as "optimizer",
+      })) as TripOptimizeResponse["assignments"]
+      onApply(formattedAssignments)
     }
     onClose()
   }

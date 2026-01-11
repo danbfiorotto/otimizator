@@ -31,7 +31,7 @@ export function FixedWindowsManager({ fixedItems = [], onChange }: Props) {
     onChange(fixedItems?.filter((_, i) => i !== index) || [])
   }
 
-  const updateFixedItem = (index: number, updates: Partial<DayPlanRequest["fixedItems"][0]>) => {
+  const updateFixedItem = (index: number, updates: Partial<NonNullable<DayPlanRequest["fixedItems"]>[0]>) => {
     const updated = [...(fixedItems || [])]
     updated[index] = { ...updated[index], ...updates }
     onChange(updated)

@@ -44,7 +44,7 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
         <CardContent className="space-y-4">
           {assignmentsWithInfo.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Arraste parques para os dias ou clique em "Otimizar" para sugestões automáticas
+              Arraste parques para os dias ou clique em &quot;Otimizar&quot; para sugestões automáticas
             </p>
           ) : (
             <div className="space-y-3">

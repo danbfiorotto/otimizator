@@ -1,11 +1,13 @@
 "use client"
 
 import Link from "next/link"
+import { Copy } from "lucide-react"
 import { useGroup } from "@/lib/hooks/useGroup"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useTrips } from "@/lib/hooks/useTrips"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function DashboardPage() {
   const { data: group, isLoading: groupLoading } = useGroup()

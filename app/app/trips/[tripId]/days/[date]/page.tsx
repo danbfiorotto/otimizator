@@ -28,11 +28,16 @@ export default function DayPlannerPage({ params }: Props) {
   const [mustDo, setMustDo] = useState<string[]>([])
   const [want, setWant] = useState<string[]>([])
   const [optional, setOptional] = useState<string[]>([])
-  const [preferences, setPreferences] = useState({
+  const [preferences, setPreferences] = useState<{
+    arrivalTime: string
+    lunchWindow?: { start: string; end: string }
+    walkMinutesDefault: number
+    mode: "p50" | "p80"
+  }>({
     arrivalTime: "08:00",
     lunchWindow: { start: "12:30", end: "13:30" },
     walkMinutesDefault: 10,
-    mode: "p80" as "p50" | "p80",
+    mode: "p80",
   })
   const [fixedItems, setFixedItems] = useState<DayPlanRequest["fixedItems"]>([])
 

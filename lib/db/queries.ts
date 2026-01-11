@@ -87,6 +87,7 @@ export async function getAttractionsByPark(parkId: string): Promise<Attraction[]
 export async function upsertAttraction(
   attraction: Partial<Attraction> & { park_id: string; name: string }
 ): Promise<Attraction> {
+  const supabase = createServiceClient()
   const { data, error } = await supabase
     .from("attractions")
     .upsert(attraction, { onConflict: "park_id,name" })

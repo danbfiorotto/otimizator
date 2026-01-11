@@ -242,13 +242,9 @@ export async function optimizeParkDays(request: TripOptimizeRequest): Promise<Tr
         date,
         parkId,
         score: scoreResult.score,
-        breakdown: {
-          crowd: scoreResult.breakdown.crowd,
-          hours: scoreResult.breakdown.hours,
-          weekend: scoreResult.breakdown.weekend,
-          travel: scoreResult.breakdown.travel,
-          streak: scoreResult.breakdown.streak,
-        },
+        breakdown: Object.fromEntries(
+          Object.entries(scoreResult.breakdown).filter(([_, v]) => typeof v === "number")
+        ) as Record<string, number>,
         source: "optimizer" as const,
       }
     })

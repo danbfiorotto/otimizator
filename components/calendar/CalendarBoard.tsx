@@ -29,9 +29,11 @@ export function CalendarBoard({ tripId, trip }: Props) {
   const { toast } = useToast()
   const { data: parks } = useParks()
 
-  const startDate = parseISO(trip.start_date)
-  const endDate = parseISO(trip.end_date)
-  const days = useMemo(() => eachDayOfInterval({ start: startDate, end: endDate }), [trip.start_date, trip.end_date])
+  const days = useMemo(() => {
+    const startDate = parseISO(trip.start_date)
+    const endDate = parseISO(trip.end_date)
+    return eachDayOfInterval({ start: startDate, end: endDate })
+  }, [trip.start_date, trip.end_date])
   
   // Memoize selected parks to avoid unnecessary re-renders
   const selectedParkIds = useMemo(() => {
