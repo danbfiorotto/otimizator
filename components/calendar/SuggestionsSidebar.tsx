@@ -4,13 +4,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useTrip } from "@/lib/hooks/useTrips"
 import { useParks } from "@/lib/hooks/useParks"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, isValid } from "date-fns"
 import { useParkCalendar } from "@/lib/hooks/useParkCalendar"
 import { Info } from "lucide-react"
 
 type Props = {
   tripId: string
   assignments: Record<string, { parkId: string | null; isLocked: boolean }>
+}
+
+/**
+ * Safely format a date string, returning a fallback if invalid
+ */
+function safeFormatDate(dateString: string, formatStr: string): string {
+  if (!dateString) return "Data inválida"
+  try {
+    const date = parseISO(dateString)
+    if (!isValid(date)) {
+      return "Data inválida"
+    }
+    return format(date, formatStr)
+  } catch (error) {
+    console.error("Error formatting date:", dateString, error)
+    return "Data inválida"
+  }
 }
 
 export function SuggestionsSidebar({ tripId, assignments }: Props) {
@@ -24,7 +41,17 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
 
   // Get assignments with park info and scores
   const assignmentsWithInfo = Object.entries(assignments)
-    .filter(([_, assignment]) => assignment.parkId)
+    .filter(([date, assignment]) => {
+      // Filter out invalid dates and assignments without parks
+      if (!assignment.parkId) return false
+      if (!date) return false
+      try {
+        const parsed = parseISO(date)
+        return isValid(parsed)
+      } catch {
+        return false
+      }
+    })
     .map(([date, assignment]) => {
       const park = parks?.find((p) => p.id === assignment.parkId)
       return {
@@ -33,7 +60,7 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
         isLocked: assignment.isLocked,
       }
     })
-    .filter((item) => item.park)
+    .filter((item) => item.park && item.date)
 
   return (
     <div className="w-80">
@@ -52,7 +79,7 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
                 <div key={item.date} className="border rounded p-2 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium">
-                      {format(parseISO(item.date), "dd/MM")}
+                      {safeFormatDate(item.date, "dd/MM")}
                     </span>
                     {item.isLocked && (
                       <Badge variant="outline" className="text-xs">

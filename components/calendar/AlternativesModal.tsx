@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useParks } from "@/lib/hooks/useParks"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { TripOptimizeResponse } from "@/lib/dto/types"
 
@@ -18,6 +18,23 @@ type Props = {
   alternatives: TripOptimizeResponse
   onClose: () => void
   onApply?: (assignments: TripOptimizeResponse["assignments"]) => void
+}
+
+/**
+ * Safely format a date string, returning a fallback if invalid
+ */
+function safeFormatDate(dateString: string, formatStr: string, locale?: any): string {
+  if (!dateString) return "Data inválida"
+  try {
+    const date = parseISO(dateString)
+    if (!isValid(date)) {
+      return "Data inválida"
+    }
+    return format(date, formatStr, locale ? { locale } : undefined)
+  } catch (error) {
+    console.error("Error formatting date:", dateString, error)
+    return "Data inválida"
+  }
 }
 
 export function AlternativesModal({ alternatives, onClose, onApply }: Props) {
@@ -68,7 +85,7 @@ export function AlternativesModal({ alternatives, onClose, onApply }: Props) {
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-medium min-w-[120px]">
-                      {format(parseISO(assignment.date), "EEEE, dd/MM", { locale: ptBR })}
+                      {safeFormatDate(assignment.date, "EEEE, dd/MM", ptBR)}
                     </span>
                     <Badge variant={assignment.parkId ? "default" : "outline"}>
                       {getParkName(assignment.parkId)}
@@ -114,7 +131,7 @@ export function AlternativesModal({ alternatives, onClose, onApply }: Props) {
                   >
                     <div className="flex items-center gap-3">
                       <span className="font-medium min-w-[120px]">
-                        {format(parseISO(assignment.date), "EEEE, dd/MM", { locale: ptBR })}
+                        {safeFormatDate(assignment.date, "EEEE, dd/MM", ptBR)}
                       </span>
                       <Badge variant={assignment.parkId ? "default" : "outline"}>
                         {getParkName(assignment.parkId)}
