@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { DndContext, DragEndEvent, closestCenter } from "@dnd-kit/core"
-import { DayColumn } from "./DayColumn"
+import { WeeklyCalendarGrid } from "./WeeklyCalendarGrid"
 import { SuggestionsSidebar } from "./SuggestionsSidebar"
 import { OptimizeButton } from "./OptimizeButton"
 import { UnassignedParksColumn } from "./UnassignedParksColumn"
@@ -334,7 +334,14 @@ export function CalendarBoard({ tripId, trip }: Props) {
         {/* Calendário Principal */}
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Calendário da Viagem</h2>
+            <div>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                🎢 Calendário da Viagem
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Arraste e solte parques nos dias da semana
+              </p>
+            </div>
             <div className="flex gap-2">
               <OptimizeButton
                 tripId={tripId}
@@ -352,19 +359,11 @@ export function CalendarBoard({ tripId, trip }: Props) {
               </Button>
             </div>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {days.map((day) => {
-              const dateStr = format(day, "yyyy-MM-dd")
-              return (
-                <DayColumn
-                  key={dateStr}
-                  date={day}
-                  assignment={assignments[dateStr]}
-                  onLockToggle={() => handleLockToggle(dateStr)}
-                />
-              )
-            })}
-          </div>
+          <WeeklyCalendarGrid
+            days={days}
+            assignments={assignments}
+            onLockToggle={handleLockToggle}
+          />
         </div>
 
         {/* Sidebar de Sugestões */}

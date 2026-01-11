@@ -30,13 +30,26 @@ export function DayColumn({ date, assignment, onLockToggle }: Props) {
   const isLocked = assignment?.isLocked || false
   const hasPark = !!assignment?.parkId
 
+  const isToday = format(new Date(), "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
+  const isWeekend = dayOfWeek === "sáb" || dayOfWeek === "dom"
+
   return (
-    <div ref={setNodeRef} className="min-w-[200px]">
-      <Card className={isOver ? "border-primary bg-primary/5" : isLocked ? "border-amber-500" : ""}>
-        <CardHeader className="pb-3">
+    <div ref={setNodeRef} className="h-full">
+      <Card 
+        className={`
+          h-full transition-all duration-200 hover:shadow-lg
+          ${isOver ? "border-primary border-2 bg-gradient-to-br from-primary/10 to-primary/5 shadow-md scale-105" : ""}
+          ${isLocked ? "border-amber-500 border-2 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900" : ""}
+          ${isToday ? "ring-2 ring-primary ring-offset-2" : ""}
+          ${isWeekend ? "bg-gradient-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-950/30 dark:to-pink-950/30" : ""}
+        `}
+      >
+        <CardHeader className="pb-3 bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm">
-              {dayOfWeek} {dayNumber}
+            <CardTitle className={`text-sm font-bold ${isToday ? "text-primary" : ""}`}>
+              <span className="text-xs text-muted-foreground uppercase">{dayOfWeek}</span>
+              <br />
+              <span className="text-lg">{dayNumber}</span>
             </CardTitle>
             {hasPark && onLockToggle && (
               <Button
@@ -92,8 +105,11 @@ export function DayColumn({ date, assignment, onLockToggle }: Props) {
               </div>
             </SortableContext>
           ) : (
-            <div className="text-sm text-muted-foreground text-center py-4">
-              Arraste um parque aqui
+            <div className="text-xs text-muted-foreground text-center py-8 flex flex-col items-center gap-2">
+              <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+                <span className="text-2xl">🎢</span>
+              </div>
+              <span>Arraste um parque aqui</span>
             </div>
           )}
         </CardContent>

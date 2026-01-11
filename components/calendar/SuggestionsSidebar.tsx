@@ -63,10 +63,13 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
     .filter((item) => item.park && item.date)
 
   return (
-    <div className="w-80">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Sugestões e Informações</CardTitle>
+    <div className="w-80 flex-shrink-0">
+      <Card className="h-fit sticky top-4 border-2 bg-gradient-to-br from-background to-muted/30">
+        <CardHeader className="bg-gradient-to-r from-accent/10 to-primary/10">
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <span className="text-lg">✨</span>
+            Sugestões e Informações
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {assignmentsWithInfo.length === 0 ? (
@@ -76,9 +79,12 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
           ) : (
             <div className="space-y-3">
               {assignmentsWithInfo.map((item) => (
-                <div key={item.date} className="border rounded p-2 space-y-1">
+                <div 
+                  key={item.date} 
+                  className="border-2 rounded-lg p-3 space-y-2 bg-gradient-to-br from-card to-muted/20 hover:shadow-lg transition-all duration-200 hover:scale-105"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium">
+                    <span className="text-xs font-bold text-primary">
                       {safeFormatDate(item.date, "dd/MM")}
                     </span>
                     {item.isLocked && (

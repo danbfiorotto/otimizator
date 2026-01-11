@@ -36,16 +36,26 @@ export function ParkCard({ parkId }: Props) {
     <Card
       ref={setNodeRef}
       style={style}
-      className={isDragging ? "border-primary" : ""}
+      className={`
+        transition-all duration-200 hover:shadow-lg hover:scale-105
+        ${isDragging ? "border-primary border-2 shadow-xl scale-110 rotate-2" : "border-2"}
+        bg-gradient-to-br from-primary/10 via-secondary/10 to-accent/10
+        hover:from-primary/20 hover:via-secondary/20 hover:to-accent/20
+      `}
     >
       <CardContent className="p-3 flex items-center gap-2">
-        <div {...attributes} {...listeners} className="cursor-grab">
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+          <div className="p-1 rounded hover:bg-primary/20 transition-colors">
+            <GripVertical className="h-4 w-4 text-primary" />
+          </div>
         </div>
-        <div className="flex-1">
-          <div className="font-medium text-sm">{park.name}</div>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-sm text-foreground truncate">{park.name}</div>
         </div>
-        <Badge variant="outline" className="text-xs">
+        <Badge 
+          variant="outline" 
+          className="text-xs font-semibold border-primary/30 bg-primary/10 text-primary"
+        >
           {park.slug}
         </Badge>
       </CardContent>

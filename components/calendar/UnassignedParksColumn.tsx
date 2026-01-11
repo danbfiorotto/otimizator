@@ -20,13 +20,18 @@ export function UnassignedParksColumn({ parks }: Props) {
   return (
     <div className="w-64 flex-shrink-0">
       <Card
-        className={isOver ? "border-primary bg-primary/5" : ""}
+        className={`
+          transition-all duration-200 h-fit sticky top-4
+          ${isOver ? "border-primary border-2 bg-gradient-to-br from-primary/20 to-secondary/20 shadow-xl scale-105" : "border-2"}
+          bg-gradient-to-br from-background to-muted/30
+        `}
       >
-        <CardHeader>
-          <CardTitle className="text-sm">
+        <CardHeader className="bg-gradient-to-r from-primary/10 to-secondary/10">
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <span className="text-lg">🎪</span>
             Parques Sem Dia Alocado
           </CardTitle>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground mt-1">
             Arraste parques aqui para remover do calendário
           </p>
         </CardHeader>
