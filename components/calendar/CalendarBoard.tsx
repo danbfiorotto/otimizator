@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { DndContext, DragEndEvent, closestCenter } from "@dnd-kit/core"
 import { WeeklyCalendarGrid } from "./WeeklyCalendarGrid"
-import { SuggestionsSidebar } from "./SuggestionsSidebar"
 import { OptimizeButton } from "./OptimizeButton"
 import { UnassignedParksColumn } from "./UnassignedParksColumn"
 import { Button } from "@/components/ui/button"
@@ -368,11 +367,6 @@ export function CalendarBoard({ tripId, trip }: Props) {
             assignments={assignments}
             onLockToggle={handleLockToggle}
           />
-        </div>
-
-        {/* Sidebar de Sugestões */}
-        <div className="lg:w-80 w-full order-3">
-          <SuggestionsSidebar tripId={tripId} assignments={assignments} />
         </div>
       </div>
     </DndContext>
