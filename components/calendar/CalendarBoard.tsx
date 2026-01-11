@@ -187,29 +187,33 @@ export function CalendarBoard({ tripId, trip }: Props) {
     const { active, over } = event
     if (!over) return
 
-    const parkId = active.id as string
-    const targetId = over.id as string
+    try {
+      const parkId = active.id as string
+      const targetId = over.id as string
 
-    // Special ID for unassigned parks column
-    const UNASSIGNED_COLUMN_ID = "unassigned-parks"
+      // Special ID for unassigned parks column
+      const UNASSIGNED_COLUMN_ID = "unassigned-parks"
 
-    // If dropping in unassigned column, remove from all days
-    if (targetId === UNASSIGNED_COLUMN_ID) {
-      setAssignments((prev) => {
-        const newAssignments = { ...prev }
-        // Find and remove park from all days
-        Object.keys(newAssignments).forEach((date) => {
-          if (newAssignments[date].parkId === parkId) {
-            newAssignments[date] = {
-              parkId: null,
-              isLocked: newAssignments[date].isLocked,
+      // If dropping in unassigned column, remove from all days
+      if (targetId === UNASSIGNED_COLUMN_ID) {
+        setAssignments((prev) => {
+          const newAssignments = { ...prev }
+          // Find and remove park from all days
+          Object.keys(newAssignments).forEach((date) => {
+            const assignment = newAssignments[date]
+            if (assignment && assignment.parkId === parkId) {
+              newAssignments[date] = {
+                parkId: null,
+                isLocked: assignment.isLocked || false,
+                score: undefined,
+                breakdown: undefined,
+              }
             }
-          }
+          })
+          return newAssignments
         })
-        return newAssignments
-      })
-      return
-    }
+        return
+      }
 
     // Target is a date
     const targetDate = targetId
@@ -224,30 +228,44 @@ export function CalendarBoard({ tripId, trip }: Props) {
       return
     }
 
-    setAssignments((prev) => {
-      const newAssignments = { ...prev }
-      
-      // Remove park from previous day (if any)
-      Object.keys(newAssignments).forEach((date) => {
-        if (newAssignments[date].parkId === parkId && date !== targetDate) {
-          newAssignments[date] = {
-            parkId: null,
-            isLocked: newAssignments[date].isLocked,
+      setAssignments((prev) => {
+        const newAssignments = { ...prev }
+        
+        // Remove park from previous day (if any)
+        Object.keys(newAssignments).forEach((date) => {
+          const assignment = newAssignments[date]
+          if (assignment && assignment.parkId === parkId && date !== targetDate) {
+            newAssignments[date] = {
+              parkId: null,
+              isLocked: assignment.isLocked || false,
+              score: undefined,
+              breakdown: undefined,
+            }
           }
+        })
+
+        // Assign park to target date
+        const existingAssignment = prev[targetDate]
+        newAssignments[targetDate] = {
+          parkId,
+          isLocked: existingAssignment?.isLocked || false,
+          score: undefined,
+          breakdown: undefined,
         }
+
+        return newAssignments
       })
 
-      // Assign park to target date
-      newAssignments[targetDate] = {
-        parkId,
-        isLocked: prev[targetDate]?.isLocked || false,
-      }
-
-      return newAssignments
-    })
-
-    // Calculate score in real-time
-    calculateScore(parkId, targetDate)
+      // Calculate score in real-time
+      calculateScore(parkId, targetDate)
+    } catch (error) {
+      console.error("Error in handleDragEnd:", error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível mover o parque. Tente novamente.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleConfirmCalendar = async () => {

@@ -20,7 +20,6 @@ export function UnassignedParksColumn({ parks }: Props) {
   return (
     <div className="w-64 flex-shrink-0">
       <Card
-        ref={setNodeRef}
         className={isOver ? "border-primary bg-primary/5" : ""}
       >
         <CardHeader>
@@ -31,7 +30,7 @@ export function UnassignedParksColumn({ parks }: Props) {
             Arraste parques aqui para remover do calendário
           </p>
         </CardHeader>
-        <CardContent>
+        <CardContent ref={setNodeRef}>
           {parks.length > 0 ? (
             <SortableContext
               items={parks.map((p) => p.id)}
