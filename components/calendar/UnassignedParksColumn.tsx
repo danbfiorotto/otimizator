@@ -18,10 +18,10 @@ export function UnassignedParksColumn({ parks }: Props) {
   })
 
   return (
-    <div className="w-64 flex-shrink-0">
+    <div className="w-full lg:w-64 flex-shrink-0">
       <Card
         className={`
-          transition-all duration-200 h-fit sticky top-4
+          transition-all duration-200 h-fit lg:sticky lg:top-4
           ${isOver ? "border-primary border-2 bg-gradient-to-br from-primary/20 to-secondary/20 shadow-xl scale-105" : "border-2"}
           bg-gradient-to-br from-background to-muted/30
         `}

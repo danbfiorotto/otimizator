@@ -63,8 +63,8 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
     .filter((item) => item.park && item.date)
 
   return (
-    <div className="w-80 flex-shrink-0">
-      <Card className="h-fit sticky top-4 border-2 bg-gradient-to-br from-background to-muted/30">
+    <div className="w-full lg:w-80 flex-shrink-0">
+      <Card className="h-fit lg:sticky lg:top-4 border-2 bg-gradient-to-br from-background to-muted/30">
         <CardHeader className="bg-gradient-to-r from-accent/10 to-primary/10">
           <CardTitle className="text-sm font-bold flex items-center gap-2">
             <span className="text-lg">✨</span>

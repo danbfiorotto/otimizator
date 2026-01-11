@@ -327,22 +327,24 @@ export function CalendarBoard({ tripId, trip }: Props) {
 
   return (
     <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
         {/* Coluna de Parques Não Alocados - Sempre visível */}
-        <UnassignedParksColumn parks={unassignedParks} />
+        <div className="lg:w-64 w-full order-2 lg:order-1">
+          <UnassignedParksColumn parks={unassignedParks} />
+        </div>
 
         {/* Calendário Principal */}
-        <div className="flex-1 min-w-0">
-          <div className="flex justify-between items-center mb-6">
+        <div className="flex-1 min-w-0 order-1 lg:order-2">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 lg:mb-6">
             <div>
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
                 🎢 Calendário da Viagem
               </h2>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                 Arraste e solte parques nos dias da semana
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <OptimizeButton
                 tripId={tripId}
                 onOptimizationComplete={(newAssignments) => {
@@ -352,10 +354,12 @@ export function CalendarBoard({ tripId, trip }: Props) {
               <Button 
                 onClick={handleConfirmCalendar} 
                 disabled={isSaving}
-                className="gap-2"
+                className="gap-2 text-xs sm:text-sm"
+                size="sm"
               >
-                <Check className="h-4 w-4" />
-                {isSaving ? "Salvando..." : "Confirmar Calendário"}
+                <Check className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">{isSaving ? "Salvando..." : "Confirmar Calendário"}</span>
+                <span className="sm:hidden">{isSaving ? "Salvando..." : "Confirmar"}</span>
               </Button>
             </div>
           </div>
@@ -367,7 +371,9 @@ export function CalendarBoard({ tripId, trip }: Props) {
         </div>
 
         {/* Sidebar de Sugestões */}
-        <SuggestionsSidebar tripId={tripId} assignments={assignments} />
+        <div className="lg:w-80 w-full order-3">
+          <SuggestionsSidebar tripId={tripId} assignments={assignments} />
+        </div>
       </div>
     </DndContext>
   )

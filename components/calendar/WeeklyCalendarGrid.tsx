@@ -73,14 +73,14 @@ export function WeeklyCalendarGrid({ days, assignments, onLockToggle }: Props) {
   return (
     <div className="space-y-2">
       {/* Header with week days */}
-      <div className="grid grid-cols-7 gap-2 mb-4">
+      <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 sm:mb-4 overflow-x-auto">
         {WEEK_DAYS.map((dayName, index) => (
           <div
             key={dayName}
             className={`
-              text-center text-sm font-bold py-3 px-2 rounded-lg
+              text-center text-xs sm:text-sm font-bold py-2 sm:py-3 px-1 sm:px-2 rounded-lg
               ${index >= 5 ? "bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 text-purple-700 dark:text-purple-300" : "bg-gradient-to-br from-primary/10 to-secondary/10 text-primary dark:text-primary-foreground"}
-              border-2 border-transparent
+              border-2 border-transparent min-w-[60px] sm:min-w-0
             `}
           >
             {dayName}
@@ -88,15 +88,17 @@ export function WeeklyCalendarGrid({ days, assignments, onLockToggle }: Props) {
         ))}
       </div>
 
-      {/* Calendar weeks */}
-      {weeks.map((week, weekIndex) => (
-        <div key={weekIndex} className="grid grid-cols-7 gap-2">
+      {/* Calendar weeks - scrollable on mobile */}
+      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="inline-block min-w-full sm:block">
+          {weeks.map((week, weekIndex) => (
+            <div key={weekIndex} className="grid grid-cols-7 gap-1 sm:gap-2 min-w-[560px] sm:min-w-0">
           {week.map((day, dayIndex) => {
             if (!day) {
               return (
                 <div
                   key={`empty-${dayIndex}`}
-                  className="min-h-[180px] border-2 border-dashed border-muted rounded-lg bg-muted/20"
+                  className="min-h-[120px] sm:min-h-[150px] lg:min-h-[180px] border-2 border-dashed border-muted rounded-lg bg-muted/20"
                 />
               )
             }
@@ -113,8 +115,10 @@ export function WeeklyCalendarGrid({ days, assignments, onLockToggle }: Props) {
               />
             )
           })}
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
     </div>
   )
 }
