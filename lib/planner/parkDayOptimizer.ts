@@ -5,7 +5,7 @@ import {
   type ScoringWeights,
 } from "@/lib/planner/scoring"
 import { parseDate, formatDate, getDayOfWeek } from "@/lib/utils/time"
-import { getTripById, getTripDays, upsertTripDay, upsertTripDayAssignment } from "@/lib/db/queries"
+import { getTripById, getTripDays, upsertTripDay, upsertTripDayAssignment, getParks } from "@/lib/db/queries"
 
 /**
  * Gera todas as datas da viagem
@@ -25,9 +25,11 @@ function generateTripDates(startDate: string, endDate: string): string[] {
 }
 
 /**
- * Algoritmo greedy para atribuir parques aos dias
+ * Algoritmo global score assignment
+ * Seleciona a melhor combinação (dia, parque) globalmente a cada passo
+ * recalculando penalidades (consecutive) dinamicamente.
  */
-async function greedyAssignment(
+async function globalScoreAssignment(
   dates: string[],
   parksToSchedule: string[],
   weights: ScoringWeights,
@@ -36,49 +38,123 @@ async function greedyAssignment(
     endDate: string
     lockedAssignments: Map<string, string> // date -> parkId
     heavyParks: string[]
+    maxConsecutiveDays?: number
   }
 ): Promise<Map<string, string | null>> {
   const assignments = new Map<string, string | null>()
   const remainingParks = new Set(parksToSchedule)
+  const availableDates = new Set(dates)
 
-  // Preenche dias travados
-  for (const [date, parkId] of context.lockedAssignments) {
-    assignments.set(date, parkId)
-    remainingParks.delete(parkId)
+  // 1. Processa bloqueios fixos (travel days e locked assignments)
+  for (const date of dates) {
+    if (context.lockedAssignments.has(date)) {
+      assignments.set(date, context.lockedAssignments.get(date)!)
+      remainingParks.delete(context.lockedAssignments.get(date)!)
+      availableDates.delete(date)
+    } else if (date === context.startDate || date === context.endDate) {
+      // Bloqueia dias de viagem se não estiverem travados
+      assignments.set(date, null)
+      availableDates.delete(date)
+    }
   }
 
-  // Para cada dia livre, escolhe o parque com menor score
-  for (const date of dates) {
-    if (assignments.has(date)) {
-      continue // Já atribuído (locked)
+  // 2. Loop principal: enquanto houver parques para agendar
+  while (remainingParks.size > 0 && availableDates.size > 0) {
+    let bestMove = {
+      date: null as string | null,
+      parkId: null as string | null,
+      score: Infinity,
     }
 
-    if (remainingParks.size === 0) {
-      assignments.set(date, null) // Dia livre
-      continue
-    }
+    // Para cada dia disponível, calcula o score de todos os parques restantes
+    for (const date of availableDates) {
+      // Verifica restrição de dias consecutivos (lookbehind e lookahead simples)
+      // Nota: Como estamos preenchendo fora de ordem, a verificação de streak precisa
+      // olhar para o estado ATUAL da timeline.
+      if (context.maxConsecutiveDays) {
+        // Simulação rápida: se colocarmos um parque aqui, quebra o limite?
+        // Precisaríamos reconstruir a timeline temporária (virtual). 
+        // Simplificação: verifica apenas vizinhos imediatos já definidos
+        // Para uma verificação robusta de maxConsecutiveDays em inserção global, 
+        // precisaríamos montar a cadeia. Vamos confiar no penalty suave para desencorajar,
+        // e usar o maxConsecutiveDays como hard cap.
 
-    const previousParkId = dates.indexOf(date) > 0 ? assignments.get(dates[dates.indexOf(date) - 1]) || null : null
+        let consecutive = 0
+        const dIndex = dates.indexOf(date)
 
-    const scores = await calculateParkScoresForDate(
-      Array.from(remainingParks),
-      date,
-      weights,
-      {
-        startDate: context.startDate,
-        endDate: context.endDate,
-        previousParkId,
-        heavyParks: context.heavyParks,
+        // Verifica cadeia para trás
+        for (let i = dIndex - 1; i >= 0; i--) {
+          const d = dates[i]
+          if (assignments.has(d)) {
+            if (assignments.get(d) !== null) consecutive++
+            else break // Dia livre, streak quebrado
+          } else {
+            break // Dia não definido ainda. 
+            // Na abordagem iterativa, dias não definidos podem vir a ser parque.
+            // Porém, não podemos assumir que será. Então paramos a contagem certa.
+          }
+        }
+
+        // Verifica cadeia para frente
+        for (let i = dIndex + 1; i < dates.length; i++) {
+          const d = dates[i]
+          if (assignments.has(d)) {
+            if (assignments.get(d) !== null) consecutive++
+            else break
+          } else {
+            break
+          }
+        }
+
+        // Nota: essa checagem é "frouxa" pois ignora os dias 'available' que podem virar parque.
+        // Mas impede que a gente coloque um parque num 'buraco' de tamanho 1 entre dois blocos grandes.
+        // É melhor que nada.
+
+        if (consecutive >= context.maxConsecutiveDays) continue // Pula esse dia
       }
-    )
 
-    if (scores.length > 0) {
-      const bestPark = scores[0].parkId
-      assignments.set(date, bestPark)
-      remainingParks.delete(bestPark)
-    } else {
-      assignments.set(date, null)
+      // Contexto para score (olha vizinhos imediatos já definidos)
+      const dIndex = dates.indexOf(date)
+      const previousParkId = dIndex > 0 ? assignments.get(dates[dIndex - 1]) || null : null
+
+      const scores = await calculateParkScoresForDate(
+        Array.from(remainingParks),
+        date,
+        weights,
+        {
+          startDate: context.startDate,
+          endDate: context.endDate,
+          previousParkId,
+          heavyParks: context.heavyParks,
+        }
+      )
+
+      if (scores.length > 0) {
+        if (scores[0].score < bestMove.score) {
+          bestMove = {
+            date: date,
+            parkId: scores[0].parkId,
+            score: scores[0].score,
+          }
+        }
+      }
     }
+
+    // Se encontrou um movimento válido
+    if (bestMove.date && bestMove.parkId) {
+      assignments.set(bestMove.date, bestMove.parkId)
+      remainingParks.delete(bestMove.parkId)
+      availableDates.delete(bestMove.date)
+    } else {
+      // Não conseguiu alocar nenhum parque (provavelmente restrições)
+      // Preenche o resto com null
+      break
+    }
+  }
+
+  // Preenche dias sobrando com null
+  for (const date of availableDates) {
+    assignments.set(date, null)
   }
 
   return assignments
@@ -96,6 +172,7 @@ async function localImprovement(
     endDate: string
     lockedAssignments: Map<string, string>
     heavyParks: string[]
+    maxConsecutiveDays?: number
   }
 ): Promise<Map<string, string | null>> {
   let improved = true
@@ -187,18 +264,41 @@ export async function optimizeParkDays(request: TripOptimizeRequest): Promise<Tr
   // Parques pesados são aqueles que requerem mais tempo/energia
   // Por padrão, se o ritmo for "intense", nenhum parque é considerado pesado
   // Se for "relaxed" ou "moderate", parques maiores são considerados pesados
-  const heavyParks: string[] = []
   const pace = (trip.preferences?.pace as string | undefined) || "moderate"
-  
-  // Se o ritmo não for "intense", podemos considerar parques maiores como pesados
-  // Por enquanto, deixamos vazio - pode ser expandido com uma lista de parques pesados
-  // ou baseado em métricas como número de atrações, tamanho do parque, etc.
+
+  // Lista de slugs de parques considerados "pesados" (requerem mais tempo/energia)
+  // Magic Kingdom e Hollywood Studios são geralmente os mais intensos
+  const HEAVY_PARK_SLUGS = [
+    "magic-kingdom",
+    "hollywood-studios",
+    "universal-studios-florida",
+    "islands-of-adventure",
+  ]
+
+  // Busca os IDs dos parques pesados que estão na lista de parques selecionados
+  let heavyParks: string[] = []
+  if (pace !== "intense") {
+    try {
+      const allParks = await getParks()
+      const selectedParkIds = new Set(request.parksToSchedule)
+
+      // Filtra parques pesados que estão selecionados
+      heavyParks = allParks
+        .filter((park) => HEAVY_PARK_SLUGS.includes(park.slug) && selectedParkIds.has(park.id))
+        .map((park) => park.id)
+    } catch (error) {
+      console.error("Error fetching parks for heavy parks detection:", error)
+      // Em caso de erro, continua com lista vazia
+      heavyParks = []
+    }
+  }
 
   const context = {
     startDate: trip.start_date,
     endDate: trip.end_date,
     lockedAssignments,
     heavyParks,
+    maxConsecutiveDays: request.constraints.maxConsecutiveDays,
   }
 
   const weights: ScoringWeights = {
@@ -207,17 +307,18 @@ export async function optimizeParkDays(request: TripOptimizeRequest): Promise<Tr
     weekendPenalty: request.weights.weekendPenalty,
     travelDayPenalty: request.weights.travelDayPenalty,
     heavyStreakPenalty: 0.4, // Default
+    consecutivePenalty: 0.2, // Default: Penaliza dias seguidos para forçar espaçamento
   }
 
-  // Fase 1: Greedy
-  let assignments = await greedyAssignment(dates, request.parksToSchedule, weights, context)
+  // Fase 1: Global Assignment (substitui Greedy)
+  let assignments = await globalScoreAssignment(dates, request.parksToSchedule, weights, context)
 
   // Fase 2: Melhoria local
   assignments = await localImprovement(dates, assignments, weights, context)
 
   // Calcula scores reais para cada assignment
   const assignmentArray = await Promise.all(
-    Array.from(assignments.entries()).map(async ([date, parkId], index) => {
+    Array.from(assignments.entries()).map(async ([date, parkId]) => {
       if (!parkId) {
         return {
           date,
@@ -228,6 +329,7 @@ export async function optimizeParkDays(request: TripOptimizeRequest): Promise<Tr
         }
       }
 
+      const index = dates.indexOf(date)
       const previousParkId =
         index > 0 ? assignments.get(dates[index - 1]) || null : null
 
@@ -250,12 +352,16 @@ export async function optimizeParkDays(request: TripOptimizeRequest): Promise<Tr
     })
   )
 
+  // Ordena por data
+  assignmentArray.sort((a, b) => dates.indexOf(a.date) - dates.indexOf(b.date))
+
   // Gera alternativas reais (Plano B e C) com diferentes estratégias
   // Plano B: prioriza menos crowd, aceita mais weekend
   const weightsB: ScoringWeights = {
     ...weights,
     crowd: weights.crowd * 1.5, // Mais peso em crowd
     weekendPenalty: weights.weekendPenalty * 0.5, // Menos penalidade de weekend
+    consecutivePenalty: 0.2,
   }
 
   // Plano C: prioriza mais horas, menos penalidade de travel
@@ -263,19 +369,21 @@ export async function optimizeParkDays(request: TripOptimizeRequest): Promise<Tr
     ...weights,
     hours: weights.hours * 1.5, // Mais peso em horas
     travelDayPenalty: weights.travelDayPenalty * 0.5, // Menos penalidade de travel
+    consecutivePenalty: 0.2,
   }
 
   // Gera assignments alternativos
-  const assignmentsB = await greedyAssignment(dates, request.parksToSchedule, weightsB, context)
-  const assignmentsC = await greedyAssignment(dates, request.parksToSchedule, weightsC, context)
+  const assignmentsB = await globalScoreAssignment(dates, request.parksToSchedule, weightsB, context)
+  const assignmentsC = await globalScoreAssignment(dates, request.parksToSchedule, weightsC, context)
 
   // Calcula scores para alternativas
   const alternativeB = await Promise.all(
-    Array.from(assignmentsB.entries()).map(async ([date, parkId], index) => {
+    Array.from(assignmentsB.entries()).map(async ([date, parkId]) => {
       if (!parkId) {
         return { date, parkId: null, score: 0 }
       }
 
+      const index = dates.indexOf(date)
       const previousParkId =
         index > 0 ? assignmentsB.get(dates[index - 1]) || null : null
 
@@ -293,13 +401,15 @@ export async function optimizeParkDays(request: TripOptimizeRequest): Promise<Tr
       }
     })
   )
+  alternativeB.sort((a, b) => dates.indexOf(a.date) - dates.indexOf(b.date))
 
   const alternativeC = await Promise.all(
-    Array.from(assignmentsC.entries()).map(async ([date, parkId], index) => {
+    Array.from(assignmentsC.entries()).map(async ([date, parkId]) => {
       if (!parkId) {
         return { date, parkId: null, score: 0 }
       }
 
+      const index = dates.indexOf(date)
       const previousParkId =
         index > 0 ? assignmentsC.get(dates[index - 1]) || null : null
 
@@ -317,6 +427,7 @@ export async function optimizeParkDays(request: TripOptimizeRequest): Promise<Tr
       }
     })
   )
+  alternativeC.sort((a, b) => dates.indexOf(a.date) - dates.indexOf(b.date))
 
   const alternatives = [
     {

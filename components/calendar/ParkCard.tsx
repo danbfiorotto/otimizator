@@ -50,13 +50,9 @@ export function ParkCard({ parkId }: Props) {
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-xs sm:text-sm lg:text-base text-foreground truncate leading-tight">{park.name}</div>
-          <Badge 
-            variant="outline" 
-            className="text-[9px] sm:text-[10px] font-semibold border-primary/30 bg-primary/10 text-primary mt-0.5 sm:mt-1"
-          >
-            {park.slug}
-          </Badge>
+          <div className="font-bold text-xs sm:text-sm lg:text-base text-foreground line-clamp-2 leading-tight" title={park.name}>
+            {park.name}
+          </div>
         </div>
       </CardContent>
     </Card>

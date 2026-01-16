@@ -20,7 +20,12 @@ import { RefreshCw, Download, RadioIcon, FileText, Image, FileDown, AlertCircle,
 import { useReplan } from "@/lib/hooks/useReplan"
 import { useParkLive } from "@/lib/hooks/useParkLive"
 import { useToast } from "@/components/ui/use-toast"
+<<<<<<< Updated upstream
 import { format, parseISO } from "date-fns"
+=======
+import { useState, useEffect } from "react"
+import { safeFormatDate } from "@/lib/utils/time"
+>>>>>>> Stashed changes
 import { ptBR } from "date-fns/locale"
 import { exportAsImage, exportAsPDF, exportAsText } from "@/lib/utils/export"
 import { Badge } from "@/components/ui/badge"
@@ -194,7 +199,7 @@ export function TimelineView({ tripId, date }: Props) {
     if (!plan) return
 
     try {
-      const dateFormatted = format(parseISO(date), "dd-MM-yyyy", { locale: ptBR })
+      const dateFormatted = safeFormatDate(date, "dd-MM-yyyy", { locale: ptBR })
       const filenameBase = `plano-${dateFormatted}`
 
       if (exportFormat === "text") {

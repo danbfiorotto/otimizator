@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Calendar } from "lucide-react"
 import { useParkCalendar } from "@/lib/hooks/useParkCalendar"
-import { format, parseISO } from "date-fns"
+import { safeFormatDate } from "@/lib/utils/time"
 
 type Props = {
   parkId: string
@@ -12,7 +12,7 @@ type Props = {
 }
 
 export function DayHeader({ parkId, date }: Props) {
-  const startDate = format(parseISO(date), "yyyy-MM-dd")
+  const startDate = safeFormatDate(date, "yyyy-MM-dd")
   const endDate = startDate
   const { data: calendarDays } = useParkCalendar(parkId, startDate, endDate)
   const calendarDay = calendarDays?.[0]
@@ -26,7 +26,7 @@ export function DayHeader({ parkId, date }: Props) {
             <div className="flex items-center gap-4 text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Calendar className="h-4 w-4" />
-                {format(parseISO(date), "dd/MM/yyyy")}
+                {safeFormatDate(date, "dd/MM/yyyy")}
               </span>
               {calendarDay?.openTimeLocal && calendarDay?.closeTimeLocal && (
                 <span className="flex items-center gap-1">

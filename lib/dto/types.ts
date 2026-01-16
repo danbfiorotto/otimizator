@@ -60,6 +60,7 @@ export type TripOptimizeRequest = {
     restDays?: number // ex: 1
     avoidWeekendsFor?: string[] // park ids
     maxHeavyStreak?: number // ex: 2
+    maxConsecutiveDays?: number // ex: 3
     lockedAssignments?: Array<{ date: string; parkId: string }>
   }
   weights: {

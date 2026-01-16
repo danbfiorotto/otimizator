@@ -7,7 +7,21 @@ import type { ParkDTO } from "@/lib/dto/types"
  */
 export async function GET() {
   try {
-    const parks = await getParks()
+    let parks = await getParks()
+
+    // Lazy Seeding: If no parks found, fetch from Queue-Times and seed
+    if (parks.length === 0) {
+      console.log("Lazy seeding: No parks found, fetching from Queue-Times...")
+      const { processAllQueueTimesParks } = await import("@/lib/connectors/queueTimesRealtime")
+
+      // Fetch and save all parks (this might take a few seconds)
+      const result = await processAllQueueTimesParks()
+      console.log("Lazy seeding result:", result)
+
+      // Re-fetch parks after seeding
+      parks = await getParks()
+    }
+
     const dtos: ParkDTO[] = parks.map((p) => ({
       id: p.id,
       slug: p.slug,

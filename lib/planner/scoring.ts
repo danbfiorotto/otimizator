@@ -11,6 +11,7 @@ export interface ParkDateScore {
     weekend: number
     travel: number
     streak: number
+    consecutive: number
   }
 }
 
@@ -20,6 +21,7 @@ export interface ScoringWeights {
   weekendPenalty: number
   travelDayPenalty: number
   heavyStreakPenalty: number
+  consecutivePenalty: number
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
@@ -28,6 +30,7 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
   weekendPenalty: 0.3,
   travelDayPenalty: 0.2,
   heavyStreakPenalty: 0.4,
+  consecutivePenalty: 0.1, // Penalidade leve para dias seguidos num geral
 }
 
 /**
@@ -122,6 +125,18 @@ function calculateHeavyStreakPenalty(
 }
 
 /**
+ * Calcula penalty para dias consecutivos (qualquer parque)
+ */
+function calculateConsecutivePenalty(
+  previousParkId: string | null
+): number {
+  if (previousParkId) {
+    return 1.0 // Dia anterior teve parque
+  }
+  return 0.0
+}
+
+/**
  * Calcula score completo para um parque em uma data
  */
 export async function calculateParkDateScore(
@@ -144,6 +159,9 @@ export async function calculateParkDateScore(
   const streak = context?.previousParkId && context?.heavyParks
     ? calculateHeavyStreakPenalty(parkId, context.previousParkId, context.heavyParks)
     : 0
+  const consecutive = context?.previousParkId
+    ? calculateConsecutivePenalty(context.previousParkId)
+    : 0
 
   const breakdown = {
     crowd,
@@ -151,6 +169,7 @@ export async function calculateParkDateScore(
     weekend,
     travel,
     streak,
+    consecutive,
   }
 
   const score =
@@ -158,7 +177,8 @@ export async function calculateParkDateScore(
     weights.hours * hours +
     weights.weekendPenalty * weekend +
     weights.travelDayPenalty * travel +
-    weights.heavyStreakPenalty * streak
+    weights.heavyStreakPenalty * streak +
+    weights.consecutivePenalty * consecutive
 
   return {
     parkId,

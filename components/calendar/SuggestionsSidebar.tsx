@@ -4,7 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useTrip } from "@/lib/hooks/useTrips"
 import { useParks } from "@/lib/hooks/useParks"
+<<<<<<< Updated upstream
 import { format, parseISO, isValid } from "date-fns"
+=======
+import { safeFormatDate, safeParseDate } from "@/lib/utils/time"
+>>>>>>> Stashed changes
 import { useParkCalendar } from "@/lib/hooks/useParkCalendar"
 import { Info } from "lucide-react"
 
@@ -36,12 +40,14 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
 
   if (!trip) return null
 
-  const startDate = format(parseISO(trip.start_date), "yyyy-MM-dd")
-  const endDate = format(parseISO(trip.end_date), "yyyy-MM-dd")
+  const startDate = safeFormatDate(trip.start_date, "yyyy-MM-dd")
+  const endDate = safeFormatDate(trip.end_date, "yyyy-MM-dd")
 
   // Get assignments with park info and scores
+  // Filter out invalid dates (e.g., UUIDs that might have been used as keys by mistake)
   const assignmentsWithInfo = Object.entries(assignments)
     .filter(([date, assignment]) => {
+<<<<<<< Updated upstream
       // Filter out invalid dates and assignments without parks
       if (!assignment.parkId) return false
       if (!date) return false
@@ -51,6 +57,10 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
       } catch {
         return false
       }
+=======
+      // Valida que a chave é uma data válida e que tem um parkId
+      return safeParseDate(date) !== null && assignment.parkId !== null
+>>>>>>> Stashed changes
     })
     .map(([date, assignment]) => {
       const park = parks?.find((p) => p.id === assignment.parkId)
@@ -84,7 +94,11 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
                   className="border-2 rounded-lg p-3 space-y-2 bg-gradient-to-br from-card to-muted/20 hover:shadow-lg transition-all duration-200 hover:scale-105"
                 >
                   <div className="flex items-center justify-between">
+<<<<<<< Updated upstream
                     <span className="text-xs font-bold text-primary">
+=======
+                    <span className="text-xs font-medium">
+>>>>>>> Stashed changes
                       {safeFormatDate(item.date, "dd/MM")}
                     </span>
                     {item.isLocked && (
@@ -106,6 +120,11 @@ export function SuggestionsSidebar({ tripId, assignments }: Props) {
 }
 
 function ParkDayInfo({ parkId, date }: { parkId: string; date: string }) {
+  // Valida que a data é válida antes de fazer a chamada
+  if (!safeParseDate(date)) {
+    return null
+  }
+  
   const { data: calendarDays } = useParkCalendar(parkId, date, date)
   const calendarDay = calendarDays?.[0]
 

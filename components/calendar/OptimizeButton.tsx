@@ -8,6 +8,7 @@ import { Sparkles } from "lucide-react"
 import { AlternativesModal } from "./AlternativesModal"
 import { useState } from "react"
 import type { TripOptimizeResponse } from "@/lib/dto/types"
+import { safeParseDate } from "@/lib/utils/time"
 
 type Props = {
   tripId: string
@@ -80,9 +81,12 @@ export function OptimizeButton({ tripId, onOptimizationComplete }: Props) {
   const handleApplyPlan = (plan: TripOptimizeResponse["assignments"]) => {
     const assignments: Record<string, { parkId: string | null; isLocked: boolean }> = {}
     for (const assignment of plan) {
-      assignments[assignment.date] = {
-        parkId: assignment.parkId,
-        isLocked: false,
+      // Valida que a data é válida antes de adicionar
+      if (assignment.date && safeParseDate(assignment.date)) {
+        assignments[assignment.date] = {
+          parkId: assignment.parkId,
+          isLocked: false,
+        }
       }
     }
     if (onOptimizationComplete) {

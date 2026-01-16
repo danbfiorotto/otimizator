@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getGroupSession } from "@/lib/utils/session"
 import { createServiceClient } from "@/lib/db/supabaseServer"
 import { getTripById, createTrip, getTripDays, upsertTripDay, upsertTripDayAssignment } from "@/lib/db/queries"
-import { format, parseISO, addDays } from "date-fns"
+import { format, addDays } from "date-fns"
+import { safeParseDate } from "@/lib/utils/time"
 
 /**
  * POST /api/trips/[tripId]/duplicate - Duplica uma viagem como template
@@ -44,9 +45,14 @@ export async function POST(
     const originalDays = await getTripDays(params.tripId)
     
     for (const originalDay of originalDays) {
-      const originalDate = parseISO(originalDay.date)
+      const originalDate = safeParseDate(originalDay.date)
+      if (!originalDate) continue
+      
       const dayIndex = originalDays.findIndex((d) => d.id === originalDay.id)
-      const newDate = addDays(parseISO(newStartDate), dayIndex)
+      const parsedNewStartDate = safeParseDate(newStartDate)
+      if (!parsedNewStartDate) continue
+      
+      const newDate = addDays(parsedNewStartDate, dayIndex)
       
       // Create new trip day
       const newTripDay = await upsertTripDay({

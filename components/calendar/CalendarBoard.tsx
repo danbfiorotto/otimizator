@@ -1,14 +1,15 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { DndContext, DragEndEvent, closestCenter } from "@dnd-kit/core"
+import { DndContext, DragEndEvent, pointerWithin, DragOverlay } from "@dnd-kit/core"
 import { WeeklyCalendarGrid } from "./WeeklyCalendarGrid"
 import { OptimizeButton } from "./OptimizeButton"
 import { UnassignedParksColumn } from "./UnassignedParksColumn"
 import { Button } from "@/components/ui/button"
 import { useTrip } from "@/lib/hooks/useTrips"
 import { useParks } from "@/lib/hooks/useParks"
-import { format, eachDayOfInterval, parseISO } from "date-fns"
+import { format, eachDayOfInterval } from "date-fns"
+import { safeParseDate } from "@/lib/utils/time"
 import { useToast } from "@/components/ui/use-toast"
 import { Check } from "lucide-react"
 import type { Trip } from "@/lib/hooks/useTrips"
@@ -28,20 +29,21 @@ export function CalendarBoard({ tripId, trip }: Props) {
   const { toast } = useToast()
   const { data: parks } = useParks()
 
+  const startDate = safeParseDate(trip.start_date)
+  const endDate = safeParseDate(trip.end_date)
   const days = useMemo(() => {
-    const startDate = parseISO(trip.start_date)
-    const endDate = parseISO(trip.end_date)
+    if (!startDate || !endDate) return []
     return eachDayOfInterval({ start: startDate, end: endDate })
   }, [trip.start_date, trip.end_date])
-  
+
   // Memoize selected parks to avoid unnecessary re-renders
   const selectedParkIds = useMemo(() => {
     return (trip.preferences?.selectedParks as string[]) || []
   }, [trip.preferences?.selectedParks])
-  
+
   // Get selected parks from trip preferences
   const selectedParks = parks?.filter((p) => selectedParkIds.includes(p.id)) || []
-  
+
   // Get parks that are not yet assigned
   const assignedParkIds = new Set(
     Object.values(assignments)
@@ -53,7 +55,7 @@ export function CalendarBoard({ tripId, trip }: Props) {
   // Load existing assignments immediately (don't wait for optimization)
   useEffect(() => {
     let cancelled = false
-    
+
     const loadAssignments = async () => {
       setIsLoading(true)
       try {
@@ -71,15 +73,21 @@ export function CalendarBoard({ tripId, trip }: Props) {
           }
           return { dateStr, data: { parkId: null, isLocked: false } }
         })
-        
+
         const results = await Promise.all(assignmentPromises)
-        
+
         if (cancelled) return
-        
+
         const assignmentsData: Record<string, { parkId: string | null; isLocked: boolean }> = {}
         let hasAnyAssignment = false
-        
+
         for (const { dateStr, data } of results) {
+          // Valida que dateStr é uma data válida antes de adicionar
+          if (!dateStr || dateStr === "undefined" || !safeParseDate(dateStr)) {
+            console.warn(`Skipping invalid date: ${dateStr}`)
+            continue
+          }
+
           if (data.parkId) {
             hasAnyAssignment = true
           }
@@ -88,10 +96,10 @@ export function CalendarBoard({ tripId, trip }: Props) {
             isLocked: data.isLocked || false,
           }
         }
-        
+
         setAssignments(assignmentsData)
         setIsLoading(false) // Show calendar immediately with saved data
-        
+
         // Auto-optimize in background if no assignments exist (don't block UI)
         if (!hasAnyAssignment && selectedParkIds.length > 0) {
           // Run optimization in background without blocking
@@ -115,19 +123,22 @@ export function CalendarBoard({ tripId, trip }: Props) {
           })
             .then(async (optimizeRes) => {
               if (cancelled) return
-              
+
               if (optimizeRes.ok) {
                 const optimizeData = await optimizeRes.json()
                 // Update UI with optimized assignments
                 const optimizedAssignments: Record<string, { parkId: string | null; isLocked: boolean }> = {}
                 for (const assignment of optimizeData.assignments) {
-                  optimizedAssignments[assignment.date] = {
-                    parkId: assignment.parkId,
-                    isLocked: false,
+                  // Valida que a data é válida antes de adicionar
+                  if (assignment.date && safeParseDate(assignment.date)) {
+                    optimizedAssignments[assignment.date] = {
+                      parkId: assignment.parkId,
+                      isLocked: false,
+                    }
                   }
                 }
                 setAssignments(optimizedAssignments)
-                
+
                 toast({
                   title: "Otimização concluída",
                   description: "Plano A foi aplicado automaticamente. Você pode ajustar conforme necessário.",
@@ -146,17 +157,23 @@ export function CalendarBoard({ tripId, trip }: Props) {
     }
 
     loadAssignments()
-    
+
     return () => {
       cancelled = true
     }
   }, [tripId, days, selectedParkIds, trip.preferences?.restDays, trip.preferences?.avoidWeekends, trip.preferences?.maxHeavyStreak, toast])
 
   const calculateScore = async (parkId: string, date: string) => {
+    // Valida que a data é válida antes de calcular o score
+    if (!safeParseDate(date)) {
+      console.warn(`Invalid date for score calculation: ${date}`)
+      return
+    }
+
     if (calculatingScores.has(`${parkId}-${date}`)) return
 
     setCalculatingScores((prev) => new Set(prev).add(`${parkId}-${date}`))
-    
+
     try {
       const res = await fetch(`/api/trips/${tripId}/days/${date}/score?parkId=${parkId}`)
       if (res.ok) {
@@ -182,19 +199,31 @@ export function CalendarBoard({ tripId, trip }: Props) {
     }
   }
 
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  const handleDragStart = (event: DragEndEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
+    setActiveId(null)
+
     if (!over) return
 
     try {
       const parkId = active.id as string
       const targetId = over.id as string
 
-      // Special ID for unassigned parks column
       const UNASSIGNED_COLUMN_ID = "unassigned-parks"
 
+      // Check if target is unassigned column OR an existing unassigned park
+      // This handles "dropping on top of another unassigned park"
+      const isUnassignedTarget = targetId === UNASSIGNED_COLUMN_ID ||
+        unassignedParks.some(p => p.id === targetId)
+
       // If dropping in unassigned column, remove from all days
-      if (targetId === UNASSIGNED_COLUMN_ID) {
+      if (isUnassignedTarget) {
         setAssignments((prev) => {
           const newAssignments = { ...prev }
           // Find and remove park from all days
@@ -214,22 +243,28 @@ export function CalendarBoard({ tripId, trip }: Props) {
         return
       }
 
-    // Target is a date
-    const targetDate = targetId
+      // Target is a date
+      const targetDate = targetId
 
-    // Don't allow dragging to locked days
-    if (assignments[targetDate]?.isLocked) {
-      toast({
-        title: "Dia travado",
-        description: "Este dia está travado e não pode ser modificado",
-        variant: "destructive",
-      })
-      return
-    }
+      // Valida que targetDate é uma data válida (não um UUID)
+      if (!safeParseDate(targetDate)) {
+        console.warn(`Invalid target date for drag: ${targetDate}`)
+        return
+      }
+
+      // Don't allow dragging to locked days
+      if (assignments[targetDate]?.isLocked) {
+        toast({
+          title: "Dia travado",
+          description: "Este dia está travado e não pode ser modificado",
+          variant: "destructive",
+        })
+        return
+      }
 
       setAssignments((prev) => {
         const newAssignments = { ...prev }
-        
+
         // Remove park from previous day (if any)
         Object.keys(newAssignments).forEach((date) => {
           const assignment = newAssignments[date]
@@ -273,7 +308,7 @@ export function CalendarBoard({ tripId, trip }: Props) {
       const savePromises = days.map(async (day) => {
         const dateStr = format(day, "yyyy-MM-dd")
         const assignment = assignments[dateStr] || { parkId: null, isLocked: false }
-        
+
         const res = await fetch(`/api/trips/${tripId}/days/${dateStr}/assignment`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -325,7 +360,7 @@ export function CalendarBoard({ tripId, trip }: Props) {
   }
 
   return (
-    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
         {/* Coluna de Parques Não Alocados - Sempre visível */}
         <div className="lg:w-64 w-full order-2 lg:order-1">
@@ -350,8 +385,8 @@ export function CalendarBoard({ tripId, trip }: Props) {
                   setAssignments(newAssignments)
                 }}
               />
-              <Button 
-                onClick={handleConfirmCalendar} 
+              <Button
+                onClick={handleConfirmCalendar}
                 disabled={isSaving}
                 className="gap-2 text-xs sm:text-sm"
                 size="sm"
@@ -369,6 +404,18 @@ export function CalendarBoard({ tripId, trip }: Props) {
           />
         </div>
       </div>
+      <DragOverlay>
+        {activeId ? (
+          <div className="opacity-80 rotate-2 scale-105 cursor-grabbing pointer-events-none">
+            {/* Reusing existing park card visuals but wrapped in a div to prevent interactions */}
+            <div className="p-3 bg-background border-2 border-primary rounded-lg shadow-xl w-[150px]">
+              <div className="font-bold text-sm truncate">
+                {parks?.find(p => p.id === activeId)?.name || "Parque"}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   )
 }

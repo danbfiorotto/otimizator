@@ -5,7 +5,7 @@ import { useDayPlan } from "@/lib/hooks/useDayPlan"
 import { useTripDayAssignment } from "@/lib/hooks/useTripDayAssignment"
 import { useParks } from "@/lib/hooks/useParks"
 import { Skeleton } from "@/components/ui/skeleton"
-import { format, parseISO } from "date-fns"
+import { safeFormatDate } from "@/lib/utils/time"
 import { ptBR } from "date-fns/locale"
 import { CheckCircle2, Clock, MapPin, TrendingUp } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -66,7 +66,7 @@ export default function DaySummaryPage({ params }: Props) {
         <div>
           <h1 className="text-3xl font-bold">Resumo do Dia</h1>
           <p className="text-muted-foreground mt-1">
-            {format(parseISO(params.date), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+            {safeFormatDate(params.date, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
             {park && ` - ${park.name}`}
           </p>
         </div>

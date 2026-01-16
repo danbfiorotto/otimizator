@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 import { Plus } from "lucide-react"
-import { parseISO, isPast } from "date-fns"
+import { isPast } from "date-fns"
+import { safeParseDate } from "@/lib/utils/time"
 
 export function TripList() {
   const { data: trips, isLoading } = useTrips()
@@ -42,12 +43,12 @@ export function TripList() {
   // Separate trips into future and past
   const now = new Date()
   const futureTrips = trips.filter((trip) => {
-    const endDate = parseISO(trip.end_date)
-    return endDate >= now
+    const endDate = safeParseDate(trip.end_date)
+    return endDate && endDate >= now
   })
   const pastTrips = trips.filter((trip) => {
-    const endDate = parseISO(trip.end_date)
-    return endDate < now
+    const endDate = safeParseDate(trip.end_date)
+    return endDate && endDate < now
   })
 
   return (

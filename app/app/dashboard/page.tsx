@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useTrips } from "@/lib/hooks/useTrips"
 import { useToast } from "@/components/ui/use-toast"
 
+
 export default function DashboardPage() {
   const { data: group, isLoading: groupLoading } = useGroup()
   const { data: trips, isLoading: tripsLoading } = useTrips()
@@ -60,8 +61,8 @@ export default function DashboardPage() {
               {tripsLoading
                 ? "Carregando..."
                 : trips && trips.length > 0
-                ? `${trips.length} viagem${trips.length > 1 ? "ns" : ""}`
-                : "Nenhuma viagem ainda"}
+                  ? `${trips.length} viagem${trips.length > 1 ? "ns" : ""}`
+                  : "Nenhuma viagem ainda"}
             </CardDescription>
           </CardHeader>
           <CardContent>

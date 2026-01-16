@@ -13,7 +13,8 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { format, parseISO } from "date-fns"
+import { format } from "date-fns"
+import { safeParseDate } from "@/lib/utils/time"
 import { Calendar, MapPin, Copy, MoreVertical } from "lucide-react"
 import type { Trip } from "@/lib/hooks/useTrips"
 
@@ -22,11 +23,11 @@ type Props = {
 }
 
 export function TripCard({ trip }: Props) {
-  const startDate = parseISO(trip.start_date)
-  const endDate = parseISO(trip.end_date)
-  const daysDiff = Math.ceil(
-    (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-  )
+  const startDate = safeParseDate(trip.start_date)
+  const endDate = safeParseDate(trip.end_date)
+  const daysDiff = startDate && endDate 
+    ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    : 0
   const { toast } = useToast()
   const router = useRouter()
   const [isDuplicating, setIsDuplicating] = useState(false)

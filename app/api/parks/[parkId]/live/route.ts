@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getLiveCache, clearCache } from "@/lib/utils/cache"
 import { rateLimit } from "@/lib/utils/rateLimit"
-import { getAttractionsByPark, getLatestWaitSamples, getSourceMapping } from "@/lib/db/queries"
+import { getAttractionsByPark, getLatestWaitSamples, getSourceMappingByInternalId } from "@/lib/db/queries"
 import { processQueueTimesPark } from "@/lib/connectors/queueTimesRealtime"
 import type { AttractionLiveDTO } from "@/lib/dto/types"
 
@@ -46,20 +46,34 @@ export async function GET(
     })
 
     // Verifica se precisa atualizar (dados mais antigos que 5 minutos)
-    const needsUpdate = liveData.length > 0 && liveData[0]?.lastUpdatedUtc
+    // Verifica se precisa atualizar (dados mais antigos que 5 minutos ou inexistentes)
+    const isEmpty = liveData.length === 0
+    const needsUpdate = isEmpty || (liveData[0]?.lastUpdatedUtc
       ? Date.now() - new Date(liveData[0].lastUpdatedUtc).getTime() > UPDATE_INTERVAL_MS
-      : true
+      : true)
 
-    // Se precisa atualizar e não está em rate limit, atualiza em background
+    // Se precisa atualizar e não está em rate limit
     if (needsUpdate) {
       // Rate limit específico para updates deste parque (1 update a cada 5 minutos)
       const rateLimitResult = await rateLimit(`update:park:${params.parkId}`, 1, RATE_LIMIT_UPDATE_WINDOW)
-      
+
       if (rateLimitResult.success) {
-        // Atualiza em background (não bloqueia a resposta)
-        updateParkDataInBackground(params.parkId).catch((error) => {
-          console.error(`Background update failed for park ${params.parkId}:`, error)
-        })
+        if (isEmpty) {
+          console.log(`Live data empty for park ${params.parkId}, fetching synchronously...`)
+          // Se vazio, espera o update (foreground) para retornar dados na primeira chamada
+          await updateParkDataInBackground(params.parkId)
+
+          // Limpa o cache ANTES da chamada recursiva para garantir que dados frescos sejam carregados
+          await clearCache(`live:park:${params.parkId}` as const)
+
+          // Re-lê do banco com os novos dados
+          return await GET(request, { params }) // Recursiva segura pois agora não está mais vazio
+        } else {
+          // Atualiza em background (não bloqueia a resposta) se for apenas refresh de dados antigos
+          updateParkDataInBackground(params.parkId).catch((error) => {
+            console.error(`Background update failed for park ${params.parkId}:`, error)
+          })
+        }
       }
     }
 
@@ -80,20 +94,37 @@ export async function GET(
 async function updateParkDataInBackground(parkId: string): Promise<void> {
   try {
     // Busca Queue-Times ID do parque
-    const mapping = await getSourceMapping("queue_times", "park", parkId)
+    // Busca Queue-Times ID do parque pelo ID interno
+    let mapping = await getSourceMappingByInternalId("queue_times", "park", parkId)
+
     if (!mapping) {
-      console.warn(`No Queue-Times mapping found for park ${parkId}`)
+      console.warn(`No Queue-Times mapping found for park ${parkId}. Attempting to self-heal...`)
+      const { findAndMapPark } = await import("@/lib/connectors/queueTimesRealtime")
+      const result = await findAndMapPark(parkId)
+
+      if (result?.mapping) {
+        // Usa o mapping retornado diretamente (evita race condition na re-leitura)
+        mapping = result.mapping
+        console.log(`[${Date.now()}] Self-healing: Using returned mapping directly:`, mapping!.id)
+      } else {
+        console.warn(`Self-healing failed for park ${parkId}`)
+        return
+      }
+    }
+
+    if (!mapping) {
+      console.error(`CRITICAL: Mapping still null after self-healing for park ${parkId}`)
       return
     }
 
     const queueTimesId = parseInt(mapping.source_id, 10)
-    
-    // Processa dados do parque
-    await processQueueTimesPark(queueTimesId)
-    
+
+    // Processa dados do parque (passa o parkId interno para garantir que atrações sejam criadas corretamente)
+    await processQueueTimesPark(queueTimesId, parkId)
+
     // Limpa cache para forçar refresh na próxima requisição
     await clearCache(`live:park:${parkId}` as const)
-    
+
     console.log(`Background update completed for park ${parkId}`)
   } catch (error) {
     console.error(`Error updating park data for ${parkId}:`, error)

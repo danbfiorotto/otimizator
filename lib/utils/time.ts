@@ -1,4 +1,4 @@
-import { format, parse, addMinutes, differenceInMinutes, isBefore, isAfter } from "date-fns"
+import { format, parse, parseISO, addMinutes, differenceInMinutes, isBefore, isAfter, type Locale } from "date-fns"
 import { formatInTimeZone } from "date-fns-tz"
 
 /**
@@ -112,4 +112,50 @@ export function getDayOfWeek(date: Date): number {
  */
 export function getMonth(date: Date): number {
   return date.getMonth() + 1
+}
+
+/**
+ * Faz parse seguro de uma string de data
+ * Retorna null se a data for inválida
+ */
+export function safeParseDate(dateString: string | null | undefined): Date | null {
+  if (!dateString) return null
+  
+  try {
+    let date: Date
+    if (dateString.includes("T")) {
+      date = parseISO(dateString)
+    } else {
+      // Se não tem T, assume formato YYYY-MM-DD
+      date = parseDate(dateString)
+    }
+    
+    // Verifica se a data é válida
+    if (isNaN(date.getTime())) {
+      return null
+    }
+    
+    return date
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Formata uma string de data de forma segura
+ * Aceita formatos ISO ou YYYY-MM-DD
+ */
+export function safeFormatDate(
+  dateString: string | null | undefined, 
+  formatStr: string = "dd/MM",
+  options?: { locale?: Locale }
+): string {
+  const date = safeParseDate(dateString)
+  if (!date) return ""
+  
+  try {
+    return format(date, formatStr, options)
+  } catch {
+    return ""
+  }
 }

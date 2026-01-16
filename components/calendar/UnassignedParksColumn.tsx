@@ -18,11 +18,11 @@ export function UnassignedParksColumn({ parks }: Props) {
   })
 
   return (
-    <div className="w-full lg:w-64 flex-shrink-0">
+    <div ref={setNodeRef} className="w-full lg:w-64 flex-shrink-0">
       <Card
         className={`
-          transition-all duration-200 h-fit lg:sticky lg:top-4
-          ${isOver ? "border-primary border-2 bg-gradient-to-br from-primary/20 to-secondary/20 shadow-xl scale-105" : "border-2"}
+          transition-all duration-200 h-full min-h-[500px] lg:sticky lg:top-4
+          ${isOver ? "border-primary border-2 bg-gradient-to-br from-primary/20 to-secondary/20 shadow-xl scale-[1.02]" : "border-2"}
           bg-gradient-to-br from-background to-muted/30
         `}
       >
@@ -35,7 +35,7 @@ export function UnassignedParksColumn({ parks }: Props) {
             Arraste parques aqui para remover do calendário
           </p>
         </CardHeader>
-        <CardContent ref={setNodeRef}>
+        <CardContent>
           {parks.length > 0 ? (
             <SortableContext
               items={parks.map((p) => p.id)}

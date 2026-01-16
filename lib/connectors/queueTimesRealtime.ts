@@ -5,7 +5,7 @@ import {
   insertWaitSample,
   upsertSourceMapping,
 } from "@/lib/db/queries"
-import type { Park, Attraction } from "@/lib/db/schema"
+import type { Park, Attraction, SourceMapping } from "@/lib/db/schema"
 
 const QUEUE_TIMES_BASE_URL = "https://queue-times.com"
 
@@ -31,6 +31,12 @@ interface QueueTimesRide {
   last_updated: string
 }
 
+interface QueueTimesGroup {
+  id: number
+  name: string
+  parks: QueueTimesPark[]
+}
+
 interface QueueTimesParkData {
   lands: Array<{
     id: number
@@ -47,8 +53,8 @@ export async function fetchQueueTimesParks(): Promise<QueueTimesPark[]> {
   if (!response.ok) {
     throw new Error(`Failed to fetch parks: ${response.statusText}`)
   }
-  const data = await response.json()
-  return data as QueueTimesPark[]
+  const data = (await response.json()) as QueueTimesGroup[]
+  return data.flatMap((group) => group.parks)
 }
 
 /**
@@ -152,26 +158,35 @@ export async function processAndSaveWaitSamples(
 
 /**
  * Processa um parque completo: busca dados, normaliza e salva
+ * @param parkId Queue-Times park ID
+ * @param internalParkIdOverride Se fornecido, usa este ID interno em vez de buscar no source_mappings
  */
-export async function processQueueTimesPark(parkId: number): Promise<void> {
+export async function processQueueTimesPark(parkId: number, internalParkIdOverride?: string): Promise<void> {
   // Busca dados do parque
   const parkData = await fetchQueueTimesParkData(parkId)
-
-  // Busca parque na base para obter o ID interno
   const supabase = createServiceClient()
-  const { data: mapping } = await supabase
-    .from("source_mappings")
-    .select("internal_id")
-    .eq("source", "queue_times")
-    .eq("entity_type", "park")
-    .eq("source_id", parkId.toString())
-    .single()
 
-  if (!mapping) {
-    throw new Error(`Park mapping not found for Queue-Times ID: ${parkId}`)
+  let internalParkId: string
+
+  if (internalParkIdOverride) {
+    // Usa o ID interno fornecido (bypass do source_mappings)
+    internalParkId = internalParkIdOverride
+  } else {
+    // Busca parque na base para obter o ID interno
+    const { data: mapping } = await supabase
+      .from("source_mappings")
+      .select("internal_id")
+      .eq("source", "queue_times")
+      .eq("entity_type", "park")
+      .eq("source_id", parkId.toString())
+      .single()
+
+    if (!mapping) {
+      throw new Error(`Park mapping not found for Queue-Times ID: ${parkId}`)
+    }
+
+    internalParkId = mapping.internal_id
   }
-
-  const internalParkId = mapping.internal_id
 
   // Processa cada land e suas rides
   for (const land of parkData.lands) {
@@ -189,6 +204,21 @@ export async function processQueueTimesPark(parkId: number): Promise<void> {
 
       if (attractionMapping) {
         attractionId = attractionMapping.internal_id
+
+        // Verifica se a atração pertence ao parque correto, senão atualiza
+        const { data: existingAttraction } = await supabase
+          .from("attractions")
+          .select("park_id")
+          .eq("id", attractionId)
+          .single()
+
+        if (existingAttraction && existingAttraction.park_id !== internalParkId) {
+          console.log(`Fixing orphaned attraction ${attractionId}: ${existingAttraction.park_id} -> ${internalParkId}`)
+          await supabase
+            .from("attractions")
+            .update({ park_id: internalParkId })
+            .eq("id", attractionId)
+        }
       } else {
         // Cria nova atração
         const { attraction } = await normalizeAndSaveAttraction(internalParkId, land.name, ride)
@@ -236,4 +266,90 @@ export async function processAllQueueTimesParks(
   }
 
   return { processed, errors }
+}
+
+/**
+ * Tenta encontrar e mapear um parque existente na base com o Queue-Times
+ * Self-healing para parques sem mapping
+ */
+export async function findAndMapPark(internalParkId: string): Promise<{ mapping: SourceMapping } | null> {
+  const supabase = createServiceClient()
+
+  // 1. Busca nome do parque no banco
+  const { data: park } = await supabase.from("parks").select("name, slug").eq("id", internalParkId).single()
+  if (!park) return null
+
+  // 2. Busca lista do Queue-Times
+  const qtParks = await fetchQueueTimesParks()
+
+  // 3. Tenta encontrar match usando correspondência por palavras
+  // Extrai palavras significativas (remove "at", "the", "of", etc)
+  const stopWords = new Set(["at", "the", "of", "and", "in", "to", "park", "parks", "theme"])
+  const extractWords = (s: string) =>
+    s.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !stopWords.has(w))
+
+  const targetWords = new Set(extractWords(park.name))
+
+  // Calcula score de similaridade (palavras em comum / total de palavras)
+  let bestMatch: typeof qtParks[0] | null = null
+  let bestScore = 0
+
+  for (const p of qtParks) {
+    const qtWords = extractWords(p.name)
+    const commonWords = qtWords.filter(w => targetWords.has(w))
+
+    // Score = palavras em comum / mínimo de palavras (para não penalizar nomes longos)
+    const score = commonWords.length / Math.min(targetWords.size, qtWords.length)
+
+    if (score > bestScore && score >= 0.5) { // Mínimo 50% de match
+      bestScore = score
+      bestMatch = p
+    }
+  }
+
+  const match = bestMatch
+
+  if (match) {
+    console.log(`Self-healing: Found match for ${park.name} -> ${match.name} (${match.id})`)
+
+    // 4. "Zombie Killer": Verifica se já existe um mapping para este ID do Queue-Times apontando para OUTRO lugar
+    const { data: existingMapping } = await supabase
+      .from("source_mappings")
+      .select("*")
+      .eq("source", "queue_times")
+      .eq("entity_type", "park")
+      .eq("source_id", match.id.toString())
+      .single()
+
+    if (existingMapping) {
+      console.warn(`Self-healing: Found ZOMBIE mapping for QT ID ${match.id} -> ${existingMapping.internal_id}. DELETING...`)
+      await supabase
+        .from("source_mappings")
+        .delete()
+        .eq("id", existingMapping.id)
+    }
+
+    // 5. Salva mapping explicitamente para o ID interno solicitado
+    const mapping = await upsertSourceMapping({
+      source: "queue_times",
+      entity_type: "park",
+      source_id: match.id.toString(),
+      internal_id: internalParkId,
+      meta: {
+        original_id: match.id,
+        original_name: match.name,
+      },
+    })
+
+    console.log(`Self-healing: Upserted mapping:`, JSON.stringify(mapping, null, 2))
+
+    // Retorna o mapeamento completo para evitar race conditions na re-leitura
+    return { mapping }
+  }
+
+  console.warn(`Self-healing: No match found for park ${park.name}`)
+  return null
 }

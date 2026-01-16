@@ -20,7 +20,7 @@ import type {
 export async function getParks(): Promise<Park[]> {
   try {
     const supabase = createServiceClient()
-    
+
     // Query all parks first, then filter in memory
     // This works around an issue where .eq("is_active", true) returns 0 results
     // even though all parks have is_active = true (likely RLS or policy issue)
@@ -28,15 +28,15 @@ export async function getParks(): Promise<Park[]> {
       .from("parks")
       .select("*")
       .limit(1000) // Explicit limit to ensure we get all parks
-    
+
     if (allError) {
       throw allError
     }
-    
+
     // Filter in memory instead of using database filter
     const filteredParks = (allParks?.filter(p => p.is_active === true) || [])
       .sort((a, b) => a.name.localeCompare(b.name)) // Sort by name after filtering
-    
+
     return filteredParks
   } catch (error) {
     console.error("Error fetching parks:", error)
@@ -111,6 +111,24 @@ export async function getSourceMapping(
     .eq("source", source)
     .eq("entity_type", entityType)
     .eq("source_id", sourceId)
+    .single()
+
+  if (error && error.code !== "PGRST116") throw error
+  return data || null
+}
+
+export async function getSourceMappingByInternalId(
+  source: string,
+  entityType: string,
+  internalId: string
+): Promise<SourceMapping | null> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase
+    .from("source_mappings")
+    .select("*")
+    .eq("source", source)
+    .eq("entity_type", entityType)
+    .eq("internal_id", internalId)
     .single()
 
   if (error && error.code !== "PGRST116") throw error
